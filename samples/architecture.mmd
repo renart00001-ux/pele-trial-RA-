@@ -1,0 +1,10 @@
+﻿architecture-beta
+    group api(logos:aws)[API Services]
+    service client(logos:chrome)[Client Browser] in api
+    service gateway(logos:aws-api-gateway)[API Gateway] in api
+    service pele(logos:obsidian)[Pele Renderer] in api
+    service s3(logos:aws-s3)[Static Assets] in api
+
+    client:R -- L:gateway
+    gateway:B -- T:pele
+    pele:R -- L:s3

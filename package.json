@@ -1,0 +1,14 @@
+﻿{
+    "version":  "1.0.0",
+    "name":  "pele-trial",
+    "description":  "Obsidian Pele (Mermaid-to-SVG) Trial and Interactive Studio",
+    "scripts":  {
+                    "cli":  "node render-cli.mjs",
+                    "bench":  "node benchmark.mjs",
+                    "start":  "npx serve ."
+                },
+    "type":  "module",
+    "dependencies":  {
+                         "pele":  "^1.12.0"
+                     }
+}

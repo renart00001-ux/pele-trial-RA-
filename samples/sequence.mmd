@@ -1,0 +1,14 @@
+﻿sequenceDiagram
+    autonumber
+    actor User as 使用者
+    participant Browser as 瀏覽器 (SPA)
+    participant Pele as Obsidian Pele
+    participant SVG as 向量圖形 (SVG)
+
+    User->>Browser: 輸入或修改 Mermaid 語法
+    Browser->>Pele: render(text) 同步呼叫
+    Note over Pele: 零執行時期依賴<br>次毫秒級解析與佈局
+    Pele-->>Browser: 回傳 { svg, width, height }
+    Browser->>SVG: 即時渲染至 DOM
+    User->>Browser: 切換主題 (CSS 變數)
+    Note over SVG: 即時適應顏色，無須重新渲染！

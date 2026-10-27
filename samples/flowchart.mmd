@@ -1,0 +1,11 @@
+﻿flowchart TD
+    Start([🚀 開始測驗]) --> Choice{選擇出題模式}
+    Choice -->|隨機抽 50 題| RandomMode[標準抽卷模式<br>每題 2 分 / 70分及格]
+    Choice -->|全量出題| FullMode[全量覆蓋模式<br>作答正確比率 % 計分]
+    RandomMode --> Quiz[即時作答與反饋]
+    FullMode --> Quiz
+    Quiz --> Result{得分達標?}
+    Result -->|>= 70| Pass[🎉 恭喜及格]
+    Result -->|< 70| Fail[⚠️ 加強複習錯題]
+    Fail --> WrongDB[(錯題庫自動歸檔)]
+    Pass --> WrongDB

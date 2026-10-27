@@ -1,0 +1,649 @@
+﻿<!DOCTYPE html>
+<html lang="zh-TW" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Obsidian Pele Studio - 超極速 Mermaid-to-SVG 實驗室</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            mono: ['JetBrains Mono', 'Fira Code', 'Consolas', 'Courier New', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+  <!-- 載入本機 Obsidian Pele 獨立核心 (零相依性、次毫秒同步渲染) -->
+  <script src="pele.global.js"></script>
+  <style>
+    /* Pele 主題變數定義 */
+    .theme-obsidian-dark {
+      --pele-bg: #1e1e1e;
+      --pele-fg: #dcddde;
+      --pele-muted: #8e8e8e;
+      --pele-line: #5c5c5c;
+      --pele-surface: #252525;
+      --pele-surface-alt: #2d2d2d;
+      --pele-border: #404040;
+      --pele-accent: #7c3aed;
+      --pele-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --pele-radius: 6px;
+      --pele-series-1: #7c3aed;
+      --pele-series-2: #3b82f6;
+      --pele-series-3: #10b981;
+      --pele-series-4: #f59e0b;
+    }
+    .theme-obsidian-light {
+      --pele-bg: #ffffff;
+      --pele-fg: #1f2937;
+      --pele-muted: #6b7280;
+      --pele-line: #374151;
+      --pele-surface: #f9fafb;
+      --pele-surface-alt: #f3f4f6;
+      --pele-border: #e5e7eb;
+      --pele-accent: #6d28d9;
+      --pele-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --pele-radius: 6px;
+      --pele-series-1: #6d28d9;
+      --pele-series-2: #2563eb;
+      --pele-series-3: #059669;
+      --pele-series-4: #d97706;
+    }
+    .theme-tokyo-night {
+      --pele-bg: #1a1b26;
+      --pele-fg: #c0caf5;
+      --pele-muted: #565f89;
+      --pele-line: #7aa2f7;
+      --pele-surface: #24283b;
+      --pele-surface-alt: #292e42;
+      --pele-border: #414868;
+      --pele-accent: #bb9af7;
+      --pele-font: -apple-system, BlinkMacSystemFont, sans-serif;
+      --pele-radius: 8px;
+      --pele-series-1: #7aa2f7;
+      --pele-series-2: #bb9af7;
+      --pele-series-3: #7dcfff;
+      --pele-series-4: #9ece6a;
+    }
+    .theme-cyberpunk {
+      --pele-bg: #0d0f18;
+      --pele-fg: #00ffcc;
+      --pele-muted: #7982a9;
+      --pele-line: #ff007f;
+      --pele-surface: #16192b;
+      --pele-surface-alt: #1e2238;
+      --pele-border: #ff007f;
+      --pele-accent: #00ffcc;
+      --pele-font: 'JetBrains Mono', monospace;
+      --pele-radius: 4px;
+      --pele-series-1: #00ffcc;
+      --pele-series-2: #ff007f;
+      --pele-series-3: #ffe600;
+      --pele-series-4: #00b8ff;
+    }
+    .theme-nord {
+      --pele-bg: #2e3440;
+      --pele-fg: #eceff4;
+      --pele-muted: #d8dee9;
+      --pele-line: #88c0d0;
+      --pele-surface: #3b4252;
+      --pele-surface-alt: #434c5e;
+      --pele-border: #4c566a;
+      --pele-accent: #81a1c1;
+      --pele-font: -apple-system, BlinkMacSystemFont, sans-serif;
+      --pele-radius: 6px;
+      --pele-series-1: #88c0d0;
+      --pele-series-2: #81a1c1;
+      --pele-series-3: #a3be8c;
+      --pele-series-4: #ebcb8b;
+    }
+    .theme-paper {
+      --pele-bg: #fbf7ee;
+      --pele-fg: #2c2523;
+      --pele-muted: #7c7267;
+      --pele-line: #4a3e3d;
+      --pele-surface: #f2ecd9;
+      --pele-surface-alt: #e8dfc8;
+      --pele-border: #d4c5a9;
+      --pele-accent: #a34735;
+      --pele-font: 'Georgia', serif;
+      --pele-radius: 3px;
+      --pele-series-1: #a34735;
+      --pele-series-2: #3f6874;
+      --pele-series-3: #587948;
+      --pele-series-4: #b67823;
+    }
+
+    /* 畫布格線背景 */
+    .canvas-grid {
+      background-size: 20px 20px;
+      background-image: 
+        linear-gradient(to right, rgba(120, 120, 120, 0.08) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(120, 120, 120, 0.08) 1px, transparent 1px);
+    }
+    .dark .canvas-grid {
+      background-image: 
+        linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+    }
+
+    /* 確保生成的 SVG 正確響應與縮放 */
+    #svgViewport svg {
+      transition: transform 0.05s ease-out;
+      transform-origin: 0 0;
+      filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.12));
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col font-sans antialiased selection:bg-purple-500 selection:text-white">
+
+  <!-- 頂部導航列 -->
+  <header class="border-b border-slate-800 bg-slate-950/80 backdrop-blur sticky top-0 z-30 px-4 py-3">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+      
+      <!-- 標題與簡介 -->
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center text-xl shadow-lg shadow-purple-500/20">
+          💎
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-base sm:text-lg font-bold tracking-tight text-white flex items-center gap-1.5">
+              <span>Obsidian Pele Studio</span>
+              <span class="text-xs px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 font-mono">v1.12.0</span>
+            </h1>
+          </div>
+          <p class="text-xs text-slate-400">Mermaid-to-SVG 超極速渲染實驗室 · 零依賴 · 次毫秒同步解析</p>
+        </div>
+      </div>
+
+      <!-- 控制工具列 -->
+      <div class="flex items-center gap-2 flex-wrap text-xs">
+        
+        <!-- 範本選單 -->
+        <div class="flex items-center gap-1 bg-slate-800/80 border border-slate-700 rounded-lg px-2 py-1">
+          <span class="text-slate-400">範本:</span>
+          <select id="presetSelect" class="bg-transparent text-white font-medium focus:outline-none cursor-pointer">
+            <option value="flowchart" class="bg-slate-800">Flowchart (流程圖)</option>
+            <option value="gitgraph" class="bg-slate-800">GitGraph (分支歷史)</option>
+            <option value="sequence" class="bg-slate-800">Sequence (時序圖)</option>
+            <option value="mindmap" class="bg-slate-800">Mindmap (心智圖)</option>
+            <option value="architecture" class="bg-slate-800">Architecture (架構圖)</option>
+            <option value="pie" class="bg-slate-800">Pie Chart (圓餅圖)</option>
+            <option value="state" class="bg-slate-800">State Diagram (狀態機)</option>
+            <option value="er" class="bg-slate-800">ER Diagram (實體關聯)</option>
+          </select>
+        </div>
+
+        <!-- 主題選單 -->
+        <div class="flex items-center gap-1 bg-slate-800/80 border border-slate-700 rounded-lg px-2 py-1">
+          <span class="text-slate-400">主題:</span>
+          <select id="themeSelect" class="bg-transparent text-white font-medium focus:outline-none cursor-pointer">
+            <option value="theme-obsidian-dark" class="bg-slate-800">🌑 Obsidian Dark</option>
+            <option value="theme-obsidian-light" class="bg-slate-800">☀️ Obsidian Light</option>
+            <option value="theme-tokyo-night" class="bg-slate-800">🌌 Tokyo Night</option>
+            <option value="theme-cyberpunk" class="bg-slate-800">⚡ Cyberpunk</option>
+            <option value="theme-nord" class="bg-slate-800">🧊 Nord</option>
+            <option value="theme-paper" class="bg-slate-800">📜 Warm Paper</option>
+          </select>
+        </div>
+
+        <!-- 匯出與操作按鈕 -->
+        <button id="copySvgBtn" type="button" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 transition flex items-center gap-1">
+          <span>📋</span><span>複製 SVG</span>
+        </button>
+        <button id="downloadSvgBtn" type="button" class="px-2.5 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-semibold shadow-sm transition flex items-center gap-1">
+          <span>⬇</span><span>下載 SVG</span>
+        </button>
+        <button id="downloadPngBtn" type="button" class="px-2.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold shadow-sm transition flex items-center gap-1">
+          <span>🖼️</span><span>匯出 PNG</span>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- 主操作區：左右分割編輯與預覽 -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-4 grid grid-cols-1 lg:grid-cols-12 gap-4">
+
+    <!-- 左欄：Mermaid 編輯器 -->
+    <section class="lg:col-span-5 flex flex-col bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+      <div class="bg-slate-900/90 px-4 py-2.5 border-b border-slate-800 flex items-center justify-between text-xs">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+          <span class="font-bold text-slate-300">Mermaid 語法編輯器</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="formatBtn" type="button" class="text-slate-400 hover:text-white transition" title="清除兩側空白">格式化</button>
+          <button id="clearBtn" type="button" class="text-slate-400 hover:text-rose-400 transition" title="清空編輯器">清空</button>
+        </div>
+      </div>
+      <div class="relative flex-1 min-h-[350px] lg:min-h-0">
+        <textarea id="editor" spellcheck="false" class="w-full h-full p-4 bg-transparent text-slate-100 font-mono text-xs sm:text-sm leading-relaxed resize-none focus:outline-none selection:bg-purple-500/40" placeholder="在此輸入 Mermaid 圖表語法..."></textarea>
+      </div>
+      <!-- 錯誤提示列 -->
+      <div id="errorBanner" class="hidden bg-rose-950/80 border-t border-rose-800/80 px-4 py-2.5 text-xs text-rose-300 font-mono flex items-start gap-2">
+        <span class="text-rose-400 font-bold">⚠</span>
+        <pre id="errorText" class="whitespace-pre-wrap flex-1 break-all"></pre>
+      </div>
+    </section>
+
+    <!-- 右欄：即時渲染視窗 -->
+    <section class="lg:col-span-7 flex flex-col bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+      
+      <!-- 視窗標題列與縮放控制 -->
+      <div class="bg-slate-900/90 px-4 py-2 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
+        <div class="flex items-center gap-2">
+          <span class="font-bold text-slate-300">向量圖形即時渲染 (SVG)</span>
+          <span id="diagramTypeBadge" class="px-2 py-0.5 rounded text-[11px] font-mono bg-purple-950 text-purple-300 border border-purple-800/50">flowchart</span>
+        </div>
+        
+        <!-- 縮放與縮圖工具 -->
+        <div class="flex items-center gap-1.5">
+          <button id="zoomOutBtn" type="button" class="w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold transition flex items-center justify-center">-</button>
+          <span id="zoomLevelText" class="font-mono text-slate-400 w-12 text-center text-[11px]">100%</span>
+          <button id="zoomInBtn" type="button" class="w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold transition flex items-center justify-center">+</button>
+          <button id="zoomResetBtn" type="button" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] transition">重置</button>
+        </div>
+      </div>
+
+      <!-- 圖表畫布容器 (支援平移與縮放) -->
+      <div id="canvasContainer" class="flex-1 relative overflow-auto p-6 flex items-center justify-center canvas-grid min-h-[400px]">
+        <div id="svgWrapper" class="theme-obsidian-dark transition-colors duration-200 p-6 rounded-xl border border-slate-700/50 shadow-2xl flex items-center justify-center max-w-full">
+          <div id="svgViewport" class="transform origin-center transition-transform duration-75">
+            <!-- Pele 即時渲染的 SVG 將注入此處 -->
+          </div>
+        </div>
+      </div>
+
+      <!-- 底部效能指標儀表板 -->
+      <div class="bg-slate-900/95 border-t border-slate-800 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div class="flex items-center gap-4 flex-wrap font-mono">
+          <div class="flex items-center gap-1.5">
+            <span class="text-amber-400">⚡</span>
+            <span class="text-slate-400">渲染耗時:</span>
+            <span id="renderTimeEl" class="font-bold text-emerald-400">0.00 ms</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="text-blue-400">📐</span>
+            <span class="text-slate-400">圖形尺寸:</span>
+            <span id="dimensionsEl" class="text-slate-200">-</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="text-purple-400">📦</span>
+            <span class="text-slate-400">SVG 體積:</span>
+            <span id="svgSizeEl" class="text-slate-200">-</span>
+          </div>
+        </div>
+        <span class="text-[11px] text-slate-500 font-medium">Powered by Obsidian Pele Core</span>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- 底部技術剖析與 Obsidian Pele 特性說明 -->
+  <footer class="border-t border-slate-800 bg-slate-950 py-6 px-4 mt-4">
+    <div class="max-w-7xl mx-auto space-y-4">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+        <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-800 space-y-1.5">
+          <h3 class="font-bold text-white flex items-center gap-1.5 text-sm">
+            <span>⚡ 次毫秒同步渲染</span>
+          </h3>
+          <p class="text-slate-400 leading-relaxed">
+            不同於傳統 Mermaid.js 須依賴瀏覽器 DOM 測量與非同步執行，Pele 是純 JavaScript 同步實作，單圖渲染僅需 <strong>0.3 ~ 1.5 毫秒</strong>，速度提升高達 100~500 倍。
+          </p>
+        </div>
+        <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-800 space-y-1.5">
+          <h3 class="font-bold text-white flex items-center gap-1.5 text-sm">
+            <span>📦 零依賴極致輕量</span>
+          </h3>
+          <p class="text-slate-400 leading-relaxed">
+            無任何外部執行時期相依性（Zero Dependencies），生成的 SVG 乾淨標準，不帶任何龐大的第三方函式庫包袱，可無縫嵌入任何 Web、Electron 或行動應用程式。
+          </p>
+        </div>
+        <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-800 space-y-1.5">
+          <h3 class="font-bold text-white flex items-center gap-1.5 text-sm">
+            <span>🎨 CSS 變數原生主題</span>
+          </h3>
+          <p class="text-slate-400 leading-relaxed">
+            採用 <code class="text-purple-300 font-mono">--pele-bg</code>, <code class="text-purple-300 font-mono">--pele-fg</code> 等 CSS 變數定義顏色。更換主題只需更換 CSS Class，圖形即刻適應，<strong>完全不需重新呼叫渲染</strong>！
+          </p>
+        </div>
+      </div>
+      <div class="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500 pt-2 border-t border-slate-800/80">
+        <div>
+          <span>專案目錄：<code class="text-slate-400 font-mono">H:\國泰投信\pele-trial</code> (獨立 Git 儲存庫)</span>
+        </div>
+        <div>
+          <a href="https://github.com/obsidianmd/pele" target="_blank" class="text-purple-400 hover:text-purple-300 underline font-medium">GitHub: obsidianmd/pele</a> · 
+          <a href="https://pele.run" target="_blank" class="text-purple-400 hover:text-purple-300 underline font-medium">官方 Playground (pele.run)</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- 應用程式邏輯腳本 -->
+  <script>
+    (function () {
+      // 內建 Mermaid 圖表範本集
+      const PRESETS = {
+        flowchart: `flowchart TD
+    Start([🚀 開始測驗]) --> Choice{選擇出題模式}
+    Choice -->|隨機抽 50 題| RandomMode[標準抽卷模式\\n每題 2 分 / 70分及格]
+    Choice -->|全量出題| FullMode[全量覆蓋模式\\n作答正確比率 % 計分]
+    RandomMode --> Quiz[即時作答與反饋]
+    FullMode --> Quiz
+    Quiz --> Result{得分達標?}
+    Result -->|>= 70| Pass[🎉 恭喜及格]
+    Result -->|< 70| Fail[⚠️ 加強複習錯題]
+    Fail --> WrongDB[(錯題庫自動歸檔)]
+    Pass --> WrongDB`,
+
+        gitgraph: `gitGraph
+    commit id: "cc38fe7" tag: "v1.0.0"
+    commit id: "8f134a9"
+    branch update-exam-files
+    checkout update-exam-files
+    commit id: "cb9b8ee"
+    commit id: "52b5dbc" tag: "v1.3.0"
+    checkout main
+    commit id: "6036c78"
+    merge update-exam-files id: "51a5292"
+    commit id: "d5bebc6" tag: "v1.4.0"
+    commit id: "6d6713a" tag: "v1.5.0"
+    commit id: "2973e14" tag: "v1.6.0"
+    commit id: "002e0c1" tag: "v1.7.0"
+    commit id: "2cfa958" tag: "v1.7.1"`,
+
+        sequence: `sequenceDiagram
+    autonumber
+    actor User as 使用者
+    participant Browser as 瀏覽器 (SPA)
+    participant Pele as Obsidian Pele
+    participant SVG as 向量圖形 (SVG)
+
+    User->>Browser: 輸入或修改 Mermaid 語法
+    Browser->>Pele: render(text) 同步呼叫
+    Note over Pele: 零執行時期依賴\\n次毫秒級解析與佈局
+    Pele-->>Browser: 回傳 { svg, width, height }
+    Browser->>SVG: 即時渲染至 DOM
+    User->>Browser: 切換主題 (CSS 變數)
+    Note over SVG: 即時適應顏色，無須重新渲染！`,
+
+        mindmap: `mindmap
+  root((Obsidian Pele))
+    效能優勢
+      次毫秒級渲染速度
+      同步執行 Sync
+      比傳統 Mermaid 快數百倍
+    架構特色
+      零執行時期相依性 Zero Dependencies
+      純 JavaScript 實作
+      輕量體積 (純 SVG 輸出)
+    主題系統
+      CSS 變數驅動 (--pele-*)
+      主題切換無須重繪
+      暗黑模式原生適應
+    語法支援
+      流程圖 Flowchart
+      時序圖 Sequence
+      版本演進 GitGraph
+      心智圖 Mindmap
+      類別圖 ClassDiagram`,
+
+        architecture: `architecture-beta
+    group api(logos:aws)[API Services]
+    service client(logos:chrome)[Client Browser] in api
+    service gateway(logos:aws-api-gateway)[API Gateway] in api
+    service pele(logos:obsidian)[Pele Renderer] in api
+    service s3(logos:aws-s3)[Static Assets] in api
+
+    client:R -- L:gateway
+    gateway:B -- T:pele
+    pele:R -- L:s3`,
+
+        pie: `pie title 熱門程式語言佔比 (2026)
+    "TypeScript / JavaScript" : 45
+    "Python" : 30
+    "Rust" : 15
+    "Go" : 10`,
+
+        state: `stateDiagram-v2
+    [*] --> 待作答: 進入考卷
+    待作答 --> 已作答: 點選選項
+    已作答 --> 正確: 判定吻合正解
+    已作答 --> 錯誤: 判定答錯
+    錯誤 --> 錯題庫: 自動歸檔
+    正確 --> 下一題
+    錯題庫 --> 下一題
+    下一題 --> [*]: 完成測驗`,
+
+        er: `erDiagram
+    USER ||--o{ WRONG_QUESTION : collects
+    QUESTION ||--o{ WRONG_QUESTION : contains
+    EXAM_SESSION ||--|{ QUESTION : has
+
+    USER {
+        string uid PK
+        string email
+        string displayName
+        datetime lastLogin
+    }
+    QUESTION {
+        int id PK
+        string subject
+        string content
+        string answer
+    }
+    WRONG_QUESTION {
+        string id PK
+        int wrongCount
+        datetime addedAt
+    }`
+      };
+
+      // DOM 元件
+      const editor = document.getElementById('editor');
+      const svgViewport = document.getElementById('svgViewport');
+      const svgWrapper = document.getElementById('svgWrapper');
+      const presetSelect = document.getElementById('presetSelect');
+      const themeSelect = document.getElementById('themeSelect');
+      const errorBanner = document.getElementById('errorBanner');
+      const errorText = document.getElementById('errorText');
+      const diagramTypeBadge = document.getElementById('diagramTypeBadge');
+      const renderTimeEl = document.getElementById('renderTimeEl');
+      const dimensionsEl = document.getElementById('dimensionsEl');
+      const svgSizeEl = document.getElementById('svgSizeEl');
+
+      const copySvgBtn = document.getElementById('copySvgBtn');
+      const downloadSvgBtn = document.getElementById('downloadSvgBtn');
+      const downloadPngBtn = document.getElementById('downloadPngBtn');
+      const clearBtn = document.getElementById('clearBtn');
+      const formatBtn = document.getElementById('formatBtn');
+
+      const zoomInBtn = document.getElementById('zoomInBtn');
+      const zoomOutBtn = document.getElementById('zoomOutBtn');
+      const zoomResetBtn = document.getElementById('zoomResetBtn');
+      const zoomLevelText = document.getElementById('zoomLevelText');
+
+      let currentSvgString = '';
+      let currentZoom = 1;
+
+      // 執行 Pele 渲染
+      function doRender() {
+        const text = editor.value.trim();
+        if (!text) {
+          svgViewport.innerHTML = '<div class="text-slate-500 text-xs italic py-12">請輸入 Mermaid 語法或選擇上方範本...</div>';
+          errorBanner.classList.add('hidden');
+          dimensionsEl.textContent = '-';
+          svgSizeEl.textContent = '-';
+          return;
+        }
+
+        if (typeof window.pele === 'undefined' || typeof window.pele.render !== 'function') {
+          errorBanner.classList.remove('hidden');
+          errorText.textContent = 'pele.global.js 載入中或未正確載入，請確認檔案路徑。';
+          return;
+        }
+
+        const t0 = performance.now();
+        try {
+          const result = window.pele.render(text);
+          const t1 = performance.now();
+          const duration = (t1 - t0).toFixed(2);
+
+          errorBanner.classList.add('hidden');
+          currentSvgString = result.svg;
+          svgViewport.innerHTML = result.svg;
+
+          // 更新指標
+          renderTimeEl.textContent = duration + ' ms';
+          diagramTypeBadge.textContent = result.type || result.mermaidType || 'diagram';
+          dimensionsEl.textContent = Math.round(result.width) + ' × ' + Math.round(result.height) + ' px';
+          const kb = (result.svg.length / 1024).toFixed(2);
+          svgSizeEl.textContent = kb + ' KB';
+        } catch (err) {
+          errorBanner.classList.remove('hidden');
+          errorText.textContent = err.message || String(err);
+        }
+      }
+
+      // 防抖即時更新 (Pele 速度極快，20ms 足以獲得絲滑輸入體驗)
+      let debounceTimer = null;
+      editor.addEventListener('input', function () {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(doRender, 20);
+      });
+
+      // 支援 Tab 鍵縮排
+      editor.addEventListener('keydown', function (e) {
+        if (e.key === 'Tab') {
+          e.preventDefault();
+          const start = this.selectionStart;
+          const end = this.selectionEnd;
+          this.value = this.value.substring(0, start) + '  ' + this.value.substring(end);
+          this.selectionStart = this.selectionEnd = start + 2;
+          doRender();
+        }
+      });
+
+      // 切換範本
+      presetSelect.addEventListener('change', function () {
+        const key = this.value;
+        if (PRESETS[key]) {
+          editor.value = PRESETS[key];
+          currentZoom = 1;
+          applyZoom();
+          doRender();
+        }
+      });
+
+      // 切換主題 (直接更換 CSS 類別，Pele 的 SVG 透過 CSS 變數自動變色，無須重跑渲染！)
+      themeSelect.addEventListener('change', function () {
+        svgWrapper.className = this.value + ' transition-colors duration-200 p-6 rounded-xl border border-slate-700/50 shadow-2xl flex items-center justify-center max-w-full';
+      });
+
+      // 縮放控制
+      function applyZoom() {
+        svgViewport.style.transform = 'scale(' + currentZoom + ')';
+        zoomLevelText.textContent = Math.round(currentZoom * 100) + '%';
+      }
+
+      zoomInBtn.addEventListener('click', function () {
+        currentZoom = Math.min(3, currentZoom + 0.15);
+        applyZoom();
+      });
+
+      zoomOutBtn.addEventListener('click', function () {
+        currentZoom = Math.max(0.3, currentZoom - 0.15);
+        applyZoom();
+      });
+
+      zoomResetBtn.addEventListener('click', function () {
+        currentZoom = 1;
+        applyZoom();
+      });
+
+      // 複製 SVG
+      copySvgBtn.addEventListener('click', async function () {
+        if (!currentSvgString) return;
+        try {
+          await navigator.clipboard.writeText(currentSvgString);
+          const orig = copySvgBtn.innerHTML;
+          copySvgBtn.innerHTML = '<span>✓</span><span>已複製!</span>';
+          setTimeout(() => copySvgBtn.innerHTML = orig, 1500);
+        } catch {
+          alert('複製失敗，請手動複製。');
+        }
+      });
+
+      // 下載 SVG 檔
+      downloadSvgBtn.addEventListener('click', function () {
+        if (!currentSvgString) return;
+        const blob = new Blob([currentSvgString], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = (presetSelect.value || 'diagram') + '.svg';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      });
+
+      // 匯出 PNG
+      downloadPngBtn.addEventListener('click', function () {
+        if (!currentSvgString) return;
+        const svgEl = svgViewport.querySelector('svg');
+        if (!svgEl) return;
+
+        const svgData = new XMLSerializer().serializeToString(svgEl);
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const img = new Image();
+
+        const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(svgBlob);
+
+        img.onload = function () {
+          canvas.width = img.width * 2; // 2x 高解析度
+          canvas.height = img.height * 2;
+          ctx.scale(2, 2);
+          ctx.drawImage(img, 0, 0);
+          URL.revokeObjectURL(url);
+
+          const pngUrl = canvas.toDataURL('image/png');
+          const a = document.createElement('a');
+          a.href = pngUrl;
+          a.download = (presetSelect.value || 'diagram') + '.png';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        };
+        img.src = url;
+      });
+
+      // 清空與格式化
+      clearBtn.addEventListener('click', function () {
+        editor.value = '';
+        doRender();
+        editor.focus();
+      });
+
+      formatBtn.addEventListener('click', function () {
+        editor.value = editor.value.trim();
+        doRender();
+      });
+
+      // 初始載入
+      editor.value = PRESETS.flowchart;
+      doRender();
+    })();
+  </script>
+</body>
+</html>
