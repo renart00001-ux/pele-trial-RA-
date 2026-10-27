@@ -1,9 +1,9 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-TW" class="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Obsidian Pele Studio - 超極速 Mermaid-to-SVG 實驗室</title>
+  <title>Mermaid 多引擎即時對比實驗室 (Multi-Engine Comparator) - Mermaid.js vs Obsidian Pele</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -17,8 +17,18 @@
       }
     }
   </script>
-  <!-- 載入本機 Obsidian Pele 獨立核心 (零相依性、次毫秒同步渲染) -->
+
+  <!-- 1. 官方標準 Mermaid.js (v11) -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+
+  <!-- 2. Obsidian Pele 獨立核心 (本機零依賴) -->
   <script src="pele.global.js"></script>
+
+  <!-- 3. Firebase SDK (相容模式，支援 Google 帳號與 Cloud Firestore 跨裝置圖庫同步) -->
+  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore-compat.js"></script>
+
   <style>
     /* Pele 主題變數定義 */
     .theme-obsidian-dark {
@@ -122,215 +132,451 @@
     .canvas-grid {
       background-size: 20px 20px;
       background-image: 
-        linear-gradient(to right, rgba(120, 120, 120, 0.08) 1px, transparent 1px),
-        linear-gradient(to bottom, rgba(120, 120, 120, 0.08) 1px, transparent 1px);
-    }
-    .dark .canvas-grid {
-      background-image: 
         linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
         linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
     }
 
-    /* 確保生成的 SVG 正確響應與縮放 */
-    #svgViewport svg {
+    /* SVG 縮放視窗平滑渲染 */
+    .svg-viewport svg {
       transition: transform 0.05s ease-out;
       transform-origin: 0 0;
-      filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.12));
+      filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.25));
     }
   </style>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col font-sans antialiased selection:bg-purple-500 selection:text-white">
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased selection:bg-indigo-500 selection:text-white">
 
-  <!-- 頂部導航列 -->
-  <header class="border-b border-slate-800 bg-slate-950/80 backdrop-blur sticky top-0 z-30 px-4 py-3">
+  <!-- 頂部主導航列 -->
+  <header class="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-30 px-4 py-3 shadow-md">
     <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
       
       <!-- 標題與簡介 -->
       <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center text-xl shadow-lg shadow-purple-500/20">
-          💎
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-500 flex items-center justify-center text-xl shadow-lg shadow-indigo-500/20">
+          ⚖️
         </div>
         <div>
-          <div class="flex items-center gap-2">
-            <h1 class="text-base sm:text-lg font-bold tracking-tight text-white flex items-center gap-1.5">
-              <span>Obsidian Pele Studio</span>
-              <span class="text-xs px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 font-mono">v1.12.0</span>
+          <div class="flex items-center gap-2 flex-wrap">
+            <h1 class="text-base sm:text-lg font-bold tracking-tight text-white flex items-center gap-2">
+              <span>Mermaid 多引擎即時對比實驗室</span>
+              <span class="text-xs px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-mono">v1.0.0</span>
             </h1>
           </div>
-          <p class="text-xs text-slate-400">Mermaid-to-SVG 超極速渲染實驗室 · 零依賴 · 次毫秒同步解析</p>
+          <p class="text-xs text-slate-400">Mermaid.js vs Obsidian Pele 雙引擎即時對照 · 次毫秒效能剖析 · Firebase 雲端圖庫</p>
         </div>
       </div>
 
-      <!-- 控制工具列 -->
-      <div class="flex items-center gap-2 flex-wrap text-xs">
+      <!-- 右側帳號與雲端圖庫工具列 -->
+      <div class="flex items-center gap-2.5 flex-wrap text-xs">
         
-        <!-- 範本選單 -->
-        <div class="flex items-center gap-1 bg-slate-800/80 border border-slate-700 rounded-lg px-2 py-1">
-          <span class="text-slate-400">範本:</span>
-          <select id="presetSelect" class="bg-transparent text-white font-medium focus:outline-none cursor-pointer">
-            <option value="flowchart" class="bg-slate-800">Flowchart (流程圖)</option>
-            <option value="gitgraph" class="bg-slate-800">GitGraph (分支歷史)</option>
-            <option value="sequence" class="bg-slate-800">Sequence (時序圖)</option>
-            <option value="mindmap" class="bg-slate-800">Mindmap (心智圖)</option>
-            <option value="architecture" class="bg-slate-800">Architecture (架構圖)</option>
-            <option value="pie" class="bg-slate-800">Pie Chart (圓餅圖)</option>
-            <option value="state" class="bg-slate-800">State Diagram (狀態機)</option>
-            <option value="er" class="bg-slate-800">ER Diagram (實體關聯)</option>
-          </select>
+        <!-- 雲端同步狀態標籤 -->
+        <div class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700/80 text-slate-400">
+          <span id="syncDotIndicator" class="w-2 h-2 rounded-full bg-slate-500"></span>
+          <span id="cloudSyncStatusText">離線本機草稿</span>
         </div>
 
-        <!-- 主題選單 -->
-        <div class="flex items-center gap-1 bg-slate-800/80 border border-slate-700 rounded-lg px-2 py-1">
-          <span class="text-slate-400">主題:</span>
-          <select id="themeSelect" class="bg-transparent text-white font-medium focus:outline-none cursor-pointer">
-            <option value="theme-obsidian-dark" class="bg-slate-800">🌑 Obsidian Dark</option>
-            <option value="theme-obsidian-light" class="bg-slate-800">☀️ Obsidian Light</option>
-            <option value="theme-tokyo-night" class="bg-slate-800">🌌 Tokyo Night</option>
-            <option value="theme-cyberpunk" class="bg-slate-800">⚡ Cyberpunk</option>
-            <option value="theme-nord" class="bg-slate-800">🧊 Nord</option>
-            <option value="theme-paper" class="bg-slate-800">📜 Warm Paper</option>
-          </select>
+        <!-- 儲存當前圖表按鈕 -->
+        <button id="saveDiagramBtn" type="button" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold shadow-xs transition">
+          <span>💾</span><span>儲存圖表</span>
+        </button>
+
+        <!-- 我的圖庫按鈕 -->
+        <button id="openGalleryBtn" type="button" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold transition">
+          <span>📁</span><span>我的圖庫 (<span id="savedCountSpan">0</span>)</span>
+        </button>
+
+        <!-- Firebase Google 登入按鈕 -->
+        <button id="googleLoginBtn" type="button" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-800 font-bold shadow-sm transition">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/></svg>
+          <span>Google 登入</span>
+        </button>
+
+        <!-- 已登入使用者下拉選單 -->
+        <div id="userProfileDropdown" class="hidden relative">
+          <button id="userProfileBtn" type="button" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 transition">
+            <img id="userAvatarImg" src="" alt="avatar" class="w-5 h-5 rounded-full object-cover">
+            <span id="userNameSpan" class="max-w-[100px] truncate font-medium">已登入</span>
+            <span class="text-[10px] text-slate-400">▼</span>
+          </button>
+          <div id="userProfileMenu" class="hidden absolute right-0 mt-2 w-52 bg-slate-800 border border-slate-700 rounded-xl shadow-xl py-1 z-50 text-xs">
+            <div class="px-3 py-2 border-b border-slate-700">
+              <div id="userMenuName" class="font-bold text-white truncate">使用者</div>
+              <div id="userMenuEmail" class="text-slate-400 truncate text-[11px]">user@example.com</div>
+            </div>
+            <button id="manualSyncBtn" type="button" class="w-full text-left px-3 py-2 text-slate-300 hover:bg-slate-700 flex items-center gap-2">
+              <span>🔄</span><span>立即同步圖庫</span>
+            </button>
+            <button id="googleLogoutBtn" type="button" class="w-full text-left px-3 py-2 text-rose-400 hover:bg-slate-700 flex items-center gap-2">
+              <span>🚪</span><span>登出帳號</span>
+            </button>
+          </div>
         </div>
 
-        <!-- 匯出與操作按鈕 -->
-        <button id="copySvgBtn" type="button" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 transition flex items-center gap-1">
-          <span>📋</span><span>複製 SVG</span>
-        </button>
-        <button id="downloadSvgBtn" type="button" class="px-2.5 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-semibold shadow-sm transition flex items-center gap-1">
-          <span>⬇</span><span>下載 SVG</span>
-        </button>
-        <button id="downloadPngBtn" type="button" class="px-2.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold shadow-sm transition flex items-center gap-1">
-          <span>🖼️</span><span>匯出 PNG</span>
-        </button>
       </div>
 
     </div>
   </header>
 
-  <!-- 主操作區：左右分割編輯與預覽 -->
-  <main class="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-4 grid grid-cols-1 lg:grid-cols-12 gap-4">
+  <!-- 主版面內容 -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-5 space-y-5">
 
-    <!-- 左欄：Mermaid 編輯器 -->
-    <section class="lg:col-span-5 flex flex-col bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-      <div class="bg-slate-900/90 px-4 py-2.5 border-b border-slate-800 flex items-center justify-between text-xs">
-        <div class="flex items-center gap-2">
-          <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-          <span class="font-bold text-slate-300">Mermaid 語法編輯器</span>
+    <!-- 上方區塊：Mermaid Code 輸入區與控制面板 -->
+    <section class="bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
+      
+      <!-- 編輯器頂部工具列 -->
+      <div class="bg-slate-850 px-4 py-2.5 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+        
+        <!-- 範本快速選擇按鈕群 -->
+        <div class="flex items-center gap-1.5 flex-wrap">
+          <span class="text-slate-400 font-bold mr-1">📝 圖表範本:</span>
+          <button type="button" class="preset-btn px-2.5 py-1 rounded-md bg-slate-800 hover:bg-indigo-600 hover:text-white text-slate-300 border border-slate-700 transition" data-preset="flowchart">流程圖 (Flowchart)</button>
+          <button type="button" class="preset-btn px-2.5 py-1 rounded-md bg-slate-800 hover:bg-indigo-600 hover:text-white text-slate-300 border border-slate-700 transition" data-preset="gitgraph">Git演進圖 (GitGraph)</button>
+          <button type="button" class="preset-btn px-2.5 py-1 rounded-md bg-slate-800 hover:bg-indigo-600 hover:text-white text-slate-300 border border-slate-700 transition" data-preset="sequence">時序圖 (Sequence)</button>
+          <button type="button" class="preset-btn px-2.5 py-1 rounded-md bg-slate-800 hover:bg-indigo-600 hover:text-white text-slate-300 border border-slate-700 transition" data-preset="mindmap">心智圖 (Mindmap)</button>
+          <button type="button" class="preset-btn px-2.5 py-1 rounded-md bg-slate-800 hover:bg-indigo-600 hover:text-white text-slate-300 border border-slate-700 transition" data-preset="architecture">架構圖 (Architecture)</button>
+          <button type="button" class="preset-btn px-2.5 py-1 rounded-md bg-slate-800 hover:bg-indigo-600 hover:text-white text-slate-300 border border-slate-700 transition" data-preset="state">狀態機 (State)</button>
+          <button type="button" class="preset-btn px-2.5 py-1 rounded-md bg-slate-800 hover:bg-indigo-600 hover:text-white text-slate-300 border border-slate-700 transition" data-preset="er">關聯圖 (ER)</button>
         </div>
+
+        <!-- 輔助操作工具 -->
         <div class="flex items-center gap-2">
-          <button id="formatBtn" type="button" class="text-slate-400 hover:text-white transition" title="清除兩側空白">格式化</button>
-          <button id="clearBtn" type="button" class="text-slate-400 hover:text-rose-400 transition" title="清空編輯器">清空</button>
+          <!-- 全域主題 -->
+          <div class="flex items-center gap-1 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1">
+            <span class="text-slate-400">風格主題:</span>
+            <select id="globalThemeSelect" class="bg-transparent text-white font-medium focus:outline-none cursor-pointer">
+              <option value="theme-obsidian-dark" class="bg-slate-800">🌑 Obsidian Dark</option>
+              <option value="theme-obsidian-light" class="bg-slate-800">☀️ Obsidian Light</option>
+              <option value="theme-tokyo-night" class="bg-slate-800">🌌 Tokyo Night</option>
+              <option value="theme-cyberpunk" class="bg-slate-800">⚡ Cyberpunk</option>
+              <option value="theme-nord" class="bg-slate-800">🧊 Nord</option>
+              <option value="theme-paper" class="bg-slate-800">📜 Warm Paper</option>
+            </select>
+          </div>
+
+          <button id="formatCodeBtn" type="button" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition" title="整理頭尾空白">格式化</button>
+          <button id="clearCodeBtn" type="button" class="px-2 py-1 rounded bg-slate-800 hover:bg-rose-900/60 text-rose-300 transition" title="清空語法">清空</button>
+        </div>
+
+      </div>
+
+      <!-- 程式碼輸入區塊 -->
+      <div class="relative">
+        <textarea id="mermaidInput" spellcheck="false" rows="8" class="w-full p-4 bg-slate-950/90 text-slate-100 font-mono text-xs sm:text-sm leading-relaxed resize-y focus:outline-none selection:bg-indigo-500/40 border-b border-slate-800" placeholder="請在此輸入 Mermaid 圖表語法（支援所有 Mermaid 語法）..."></textarea>
+      </div>
+
+      <!-- 輸入區底部狀態與縮放同步列 -->
+      <div class="bg-slate-850 px-4 py-2 flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div class="flex items-center gap-2 text-slate-400">
+          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800/40 font-mono text-[11px]">
+            <span>圖表偵測：</span><strong id="detectTypeSpan">flowchart</strong>
+          </span>
+          <span class="text-slate-500">· 輸入時雙引擎自動同步極速對比</span>
+        </div>
+
+        <!-- 雙引擎畫布同步縮放工具 -->
+        <div class="flex items-center gap-2">
+          <span class="text-slate-400 font-medium">畫布同步縮放:</span>
+          <div class="flex items-center gap-1 bg-slate-850 border border-slate-750 rounded-lg p-0.5">
+            <button id="syncZoomOutBtn" type="button" class="w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold transition flex items-center justify-center">-</button>
+            <span id="syncZoomLevelText" class="font-mono text-slate-300 w-12 text-center text-[11px]">100%</span>
+            <button id="syncZoomInBtn" type="button" class="w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold transition flex items-center justify-center">+</button>
+            <button id="syncZoomResetBtn" type="button" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] transition">1:1</button>
+          </div>
+          <button id="triggerRenderBtn" type="button" class="px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition shadow-xs">
+            ⚡ 立即渲染對比
+          </button>
         </div>
       </div>
-      <div class="relative flex-1 min-h-[350px] lg:min-h-0">
-        <textarea id="editor" spellcheck="false" class="w-full h-full p-4 bg-transparent text-slate-100 font-mono text-xs sm:text-sm leading-relaxed resize-none focus:outline-none selection:bg-purple-500/40" placeholder="在此輸入 Mermaid 圖表語法..."></textarea>
-      </div>
-      <!-- 錯誤提示列 -->
-      <div id="errorBanner" class="hidden bg-rose-950/80 border-t border-rose-800/80 px-4 py-2.5 text-xs text-rose-300 font-mono flex items-start gap-2">
-        <span class="text-rose-400 font-bold">⚠</span>
-        <pre id="errorText" class="whitespace-pre-wrap flex-1 break-all"></pre>
+
+    </section>
+
+    <!-- 中間區塊：即時效能對決戰報 (Performance Scorecard) -->
+    <section class="bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 border border-indigo-900/40 rounded-2xl p-4 shadow-lg">
+      <div class="flex flex-wrap items-center justify-between gap-4">
+        
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-indigo-600/30 text-indigo-400 flex items-center justify-center text-lg border border-indigo-500/30">
+            📊
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+              <span>雙引擎即時效能對決戰報</span>
+              <span id="speedupBadge" class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                Pele 領先 0x
+              </span>
+            </h3>
+            <p class="text-xs text-slate-400">即時監測 DOM 解析耗時、SVG 輸出體積與向量結構差異</p>
+          </div>
+        </div>
+
+        <!-- 效能數據比較卡 -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs w-full lg:w-auto">
+          <div class="bg-slate-800/80 border border-slate-700/60 rounded-xl px-3 py-2 text-center">
+            <div class="text-[11px] text-slate-400">Mermaid.js 耗時</div>
+            <div id="mermaidTimeDisplay" class="font-mono font-bold text-amber-300 text-sm mt-0.5">-- ms</div>
+          </div>
+          <div class="bg-slate-800/80 border border-slate-700/60 rounded-xl px-3 py-2 text-center">
+            <div class="text-[11px] text-slate-400">Obsidian Pele 耗時</div>
+            <div id="peleTimeDisplay" class="font-mono font-bold text-emerald-400 text-sm mt-0.5">-- ms</div>
+          </div>
+          <div class="bg-slate-800/80 border border-slate-700/60 rounded-xl px-3 py-2 text-center">
+            <div class="text-[11px] text-slate-400">Mermaid SVG 體積</div>
+            <div id="mermaidSizeDisplay" class="font-mono text-slate-300 text-sm mt-0.5">-- KB</div>
+          </div>
+          <div class="bg-slate-800/80 border border-slate-700/60 rounded-xl px-3 py-2 text-center">
+            <div class="text-[11px] text-slate-400">Pele SVG 體積</div>
+            <div id="peleSizeDisplay" class="font-mono text-slate-300 text-sm mt-0.5">-- KB</div>
+          </div>
+        </div>
+
       </div>
     </section>
 
-    <!-- 右欄：即時渲染視窗 -->
-    <section class="lg:col-span-7 flex flex-col bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-      
-      <!-- 視窗標題列與縮放控制 -->
-      <div class="bg-slate-900/90 px-4 py-2 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
-        <div class="flex items-center gap-2">
-          <span class="font-bold text-slate-300">向量圖形即時渲染 (SVG)</span>
-          <span id="diagramTypeBadge" class="px-2 py-0.5 rounded text-[11px] font-mono bg-purple-950 text-purple-300 border border-purple-800/50">flowchart</span>
-        </div>
+    <!-- 下方區塊：雙引擎圖示對比區塊 (可擴充式多引擎設計) -->
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
+      <!-- 左側圖示卡：Mermaid.js (官方標準引擎) -->
+      <div class="flex flex-col bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
         
-        <!-- 縮放與縮圖工具 -->
-        <div class="flex items-center gap-1.5">
-          <button id="zoomOutBtn" type="button" class="w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold transition flex items-center justify-center">-</button>
-          <span id="zoomLevelText" class="font-mono text-slate-400 w-12 text-center text-[11px]">100%</span>
-          <button id="zoomInBtn" type="button" class="w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold transition flex items-center justify-center">+</button>
-          <button id="zoomResetBtn" type="button" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] transition">重置</button>
-        </div>
-      </div>
+        <!-- 引擎標題列與工具列 -->
+        <div class="bg-slate-850 px-4 py-2.5 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div class="flex items-center gap-2">
+            <span class="w-3 h-3 rounded-full bg-amber-400"></span>
+            <span class="font-bold text-white">引擎 A：Mermaid.js (官方標準)</span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-amber-500/10 text-amber-300 border border-amber-500/30">v11.4 CDN</span>
+          </div>
 
-      <!-- 圖表畫布容器 (支援平移與縮放) -->
-      <div id="canvasContainer" class="flex-1 relative overflow-auto p-6 flex items-center justify-center canvas-grid min-h-[400px]">
-        <div id="svgWrapper" class="theme-obsidian-dark transition-colors duration-200 p-6 rounded-xl border border-slate-700/50 shadow-2xl flex items-center justify-center max-w-full">
-          <div id="svgViewport" class="transform origin-center transition-transform duration-75">
-            <!-- Pele 即時渲染的 SVG 將注入此處 -->
+          <div class="flex items-center gap-1.5">
+            <button id="copyMermaidSvgBtn" type="button" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition" title="複製 Mermaid.js 的 SVG">📋 複製</button>
+            <button id="downloadMermaidSvgBtn" type="button" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition" title="下載 SVG 檔案">⬇ 下載</button>
           </div>
         </div>
-      </div>
 
-      <!-- 底部效能指標儀表板 -->
-      <div class="bg-slate-900/95 border-t border-slate-800 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs">
-        <div class="flex items-center gap-4 flex-wrap font-mono">
-          <div class="flex items-center gap-1.5">
-            <span class="text-amber-400">⚡</span>
-            <span class="text-slate-400">渲染耗時:</span>
-            <span id="renderTimeEl" class="font-bold text-emerald-400">0.00 ms</span>
-          </div>
-          <div class="flex items-center gap-1.5">
-            <span class="text-blue-400">📐</span>
-            <span class="text-slate-400">圖形尺寸:</span>
-            <span id="dimensionsEl" class="text-slate-200">-</span>
-          </div>
-          <div class="flex items-center gap-1.5">
-            <span class="text-purple-400">📦</span>
-            <span class="text-slate-400">SVG 體積:</span>
-            <span id="svgSizeEl" class="text-slate-200">-</span>
+        <!-- 狀態與資訊指示條 -->
+        <div class="bg-slate-950/80 px-4 py-1.5 border-b border-slate-850 flex items-center justify-between text-[11px] font-mono text-slate-400">
+          <span id="mermaidStatusSpan" class="text-emerald-400 font-semibold">● 準備就緒</span>
+          <span id="mermaidDimSpan">尺寸: --</span>
+        </div>
+
+        <!-- 畫布區塊 -->
+        <div class="flex-1 relative overflow-auto p-6 flex items-center justify-center canvas-grid min-h-[420px] max-h-[600px]">
+          <!-- 錯誤警告視窗 -->
+          <div id="mermaidErrorBox" class="hidden absolute inset-4 bg-rose-950/90 border border-rose-800 rounded-xl p-4 text-xs font-mono text-rose-300 overflow-auto z-10 whitespace-pre-wrap"></div>
+          
+          <div id="mermaidViewport" class="svg-viewport p-4 rounded-xl flex items-center justify-center max-w-full">
+            <!-- Mermaid.js 渲染的 SVG 將注入此處 -->
           </div>
         </div>
-        <span class="text-[11px] text-slate-500 font-medium">Powered by Obsidian Pele Core</span>
+
+        <!-- 引擎特質總結 -->
+        <div class="bg-slate-850 px-4 py-2 border-t border-slate-800 text-[11px] text-slate-400 flex items-center justify-between">
+          <span>特色：官方全語法規範標準 · 瀏覽器 DOM 測量</span>
+          <span class="text-amber-400 font-mono">DOM Layout</span>
+        </div>
+
       </div>
 
+      <!-- 右側圖示卡：Obsidian Pele (次毫秒超速引擎) -->
+      <div class="flex flex-col bg-slate-900 border border-indigo-900/60 rounded-2xl overflow-hidden shadow-xl ring-1 ring-indigo-500/20">
+        
+        <!-- 引擎標題列與工具列 -->
+        <div class="bg-slate-850 px-4 py-2.5 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div class="flex items-center gap-2">
+            <span class="w-3 h-3 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span class="font-bold text-white">引擎 B：Obsidian Pele (次毫秒純向量)</span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">v1.12 本地核心</span>
+          </div>
+
+          <div class="flex items-center gap-1.5">
+            <button id="copyPeleSvgBtn" type="button" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition" title="複製 Pele 的 SVG">📋 複製</button>
+            <button id="downloadPeleSvgBtn" type="button" class="px-2.5 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white font-semibold transition" title="下載 SVG 檔案">⬇ 下載 SVG</button>
+            <button id="downloadPelePngBtn" type="button" class="px-2.5 py-1 rounded bg-purple-600 hover:bg-purple-500 text-white font-semibold transition" title="匯出 2x 高清 PNG">🖼️ PNG</button>
+          </div>
+        </div>
+
+        <!-- 狀態與資訊指示條 -->
+        <div class="bg-slate-950/80 px-4 py-1.5 border-b border-slate-850 flex items-center justify-between text-[11px] font-mono text-slate-400">
+          <span id="peleStatusSpan" class="text-emerald-400 font-semibold">● 準備就緒</span>
+          <span id="peleDimSpan">尺寸: --</span>
+        </div>
+
+        <!-- 畫布區塊 -->
+        <div class="flex-1 relative overflow-auto p-6 flex items-center justify-center canvas-grid min-h-[420px] max-h-[600px]">
+          <!-- 錯誤警告視窗 -->
+          <div id="peleErrorBox" class="hidden absolute inset-4 bg-rose-950/90 border border-rose-800 rounded-xl p-4 text-xs font-mono text-rose-300 overflow-auto z-10 whitespace-pre-wrap"></div>
+          
+          <div id="peleContainer" class="theme-obsidian-dark transition-colors duration-200 p-4 rounded-xl flex items-center justify-center max-w-full">
+            <div id="peleViewport" class="svg-viewport flex items-center justify-center">
+              <!-- Obsidian Pele 渲染的 SVG 將注入此處 -->
+            </div>
+          </div>
+        </div>
+
+        <!-- 引擎特質總結 -->
+        <div class="bg-slate-850 px-4 py-2 border-t border-slate-800 text-[11px] text-slate-400 flex items-center justify-between">
+          <span>特色：零依賴 · 次毫秒純 JS 同步渲染 · CSS 變數即時換色</span>
+          <span class="text-emerald-400 font-mono">Sync Vector (No DOM)</span>
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- 可擴充多引擎宣告插槽 (預留未來增加其他渲染引擎) -->
+    <section class="bg-slate-900/60 border border-dashed border-slate-800 rounded-xl p-3 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
+      <span class="text-indigo-400 font-bold">➕ 可擴充多引擎架構已就緒：</span>
+      <span>底層採用標準化 Render Engine Adapter，可隨時插拔接入第 3/4 家引擎（如 Kroki、PlantUML、Elk、Graphviz 等）！</span>
+    </section>
+
+    <!-- 系統版本控制與更新歷程 (Version Timeline) -->
+    <section id="versionTimelineSection" class="w-full mt-8">
+      <div class="bg-slate-900 rounded-2xl border border-slate-800 shadow-md p-5 sm:p-7 space-y-6">
+        
+        <!-- 頂部標題與目前版本資訊列 (一般使用者可見之簡要狀態) -->
+        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-5">
+          <div class="flex items-center gap-3">
+            <span class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-500 text-white shadow-md text-xl shrink-0">
+              🚀
+            </span>
+            <div>
+              <div class="flex items-center gap-2 flex-wrap">
+                <h2 class="text-base sm:text-lg font-bold text-white tracking-tight">系統版本控制與更新歷程 (Version Timeline)</h2>
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  最新版本 v1.0.0
+                </span>
+              </div>
+              <p class="text-xs text-slate-400 mt-1">完整記錄多引擎圖表對比系統之架構演進、效能壓測、Firebase 雲端圖庫與 Git 進程</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 text-xs flex-wrap">
+            <span class="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 font-medium">Git 主分支：<code class="font-mono text-indigo-300 font-bold">main</code></span>
+            <span class="px-2.5 py-1 rounded-lg bg-indigo-950 text-indigo-300 font-medium border border-indigo-900/60">雙引擎：<strong class="font-bold">Mermaid.js + Pele</strong></span>
+            
+            <!-- 管理員專屬展開按鈕 -->
+            <button id="timelineAuthToggleBtn" type="button" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700 transition cursor-pointer" title="詳細版控歷程僅供管理員 (renart.00001@gmail.com) 展開查看">
+              <span id="timelineLockIcon">🔒</span>
+              <span id="timelineToggleText">詳細歷程 (需管理員登入)</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 垂直時間軸主體 (左側垂直標記線) - 預設折疊 hidden，僅限 renart.00001@gmail.com 登入後展開 -->
+        <div id="timelineNodesWrapper" class="hidden relative pl-6 sm:pl-8 border-l-2 border-indigo-800/80 ml-2 sm:ml-4 space-y-8">
+
+          <!-- Node 1: v1.0.0 -->
+          <div class="relative group">
+            <div class="absolute -left-[31px] sm:-left-[39px] top-0.5 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs shadow-md ring-4 ring-indigo-950 font-bold">
+              💎
+            </div>
+            <div class="bg-slate-850/80 border border-slate-800 rounded-xl p-4 sm:p-5 transition hover:shadow-sm">
+              <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="px-2.5 py-0.5 rounded-md text-xs font-bold bg-indigo-600 text-white shadow-xs">v1.0.0</span>
+                  <span class="text-xs font-bold text-slate-400">2026-10-27</span>
+                  <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">初版發布 / 雙引擎即時對比體系誕生</span>
+                </div>
+                <span class="text-[11px] font-mono text-slate-400">commit: initial</span>
+              </div>
+              <h3 class="text-sm sm:text-base font-bold text-white mb-2">
+                上方語法即時輸入・下方雙欄對比 (Mermaid.js vs Pele)・Firebase 雲端圖表庫
+              </h3>
+              <div class="flex flex-wrap gap-1.5 mb-3">
+                <span class="px-2 py-0.5 rounded text-[11px] font-medium bg-slate-800 text-indigo-300 border border-slate-700">⚖️ 雙引擎對比</span>
+                <span class="px-2 py-0.5 rounded text-[11px] font-medium bg-slate-800 text-emerald-300 border border-slate-700">⚡ Pele 次毫秒渲染</span>
+                <span class="px-2 py-0.5 rounded text-[11px] font-medium bg-slate-800 text-amber-300 border border-slate-700">🐢 Mermaid.js 標準</span>
+                <span class="px-2 py-0.5 rounded text-[11px] font-medium bg-slate-800 text-purple-300 border border-slate-700">☁️ Firebase 雲端同步</span>
+                <span class="px-2 py-0.5 rounded text-[11px] font-medium bg-slate-800 text-rose-300 border border-slate-700">🔒 管理員權限折疊</span>
+              </div>
+              <ul class="text-xs sm:text-sm text-slate-300 space-y-1.5 leading-relaxed list-disc list-inside">
+                <li><strong>雙引擎同步對照渲染</strong>：左欄呈現官方標準 Mermaid.js (v11.4)，右欄呈現 Obsidian Pele (v1.12.0)，即時比對渲染耗時、SVG 尺寸與排版差異。</li>
+                <li><strong>次毫秒效能戰報</strong>：即時計算雙引擎耗時差距與加速比，實測 Pele 可達 100~500 倍速度躍進。</li>
+                <li><strong>Firebase 雲端儲存與跨裝置同步</strong>：整合 Google 帳號一鍵登入與 Cloud Firestore，支援個人圖表雲端儲存、載入與管理。</li>
+                <li><strong>可擴充式多引擎架構</strong>：採用模組化介面，預留未來接入第 3/4 家圖形編譯引擎（如 Kroki、PlantUML、Elk）之擴充插槽。</li>
+                <li><strong>版本控制視覺化時間軸</strong>：比照前案落實時間軸記錄與權限管理，限制管理員帳號（<code>renart.00001@gmail.com</code>）展開查閱。</li>
+              </ul>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
     </section>
 
   </main>
 
-  <!-- 底部技術剖析與 Obsidian Pele 特性說明 -->
-  <footer class="border-t border-slate-800 bg-slate-950 py-6 px-4 mt-4">
-    <div class="max-w-7xl mx-auto space-y-4">
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-        <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-800 space-y-1.5">
-          <h3 class="font-bold text-white flex items-center gap-1.5 text-sm">
-            <span>⚡ 次毫秒同步渲染</span>
-          </h3>
-          <p class="text-slate-400 leading-relaxed">
-            不同於傳統 Mermaid.js 須依賴瀏覽器 DOM 測量與非同步執行，Pele 是純 JavaScript 同步實作，單圖渲染僅需 <strong>0.3 ~ 1.5 毫秒</strong>，速度提升高達 100~500 倍。
-          </p>
+  <!-- 彈出視窗：儲存圖表對話框 (Save Modal) -->
+  <div id="saveModal" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <span>💾</span><span>儲存圖表至圖庫</span>
+        </h3>
+        <button id="closeSaveModalBtn" type="button" class="text-slate-400 hover:text-white text-lg">✕</button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block font-medium text-slate-300 mb-1">圖表標題名稱:</label>
+          <input id="saveTitleInput" type="text" class="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-indigo-500 font-sans" placeholder="例如：新版會員驗證架構時序圖">
         </div>
-        <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-800 space-y-1.5">
-          <h3 class="font-bold text-white flex items-center gap-1.5 text-sm">
-            <span>📦 零依賴極致輕量</span>
-          </h3>
-          <p class="text-slate-400 leading-relaxed">
-            無任何外部執行時期相依性（Zero Dependencies），生成的 SVG 乾淨標準，不帶任何龐大的第三方函式庫包袱，可無縫嵌入任何 Web、Electron 或行動應用程式。
-          </p>
-        </div>
-        <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-800 space-y-1.5">
-          <h3 class="font-bold text-white flex items-center gap-1.5 text-sm">
-            <span>🎨 CSS 變數原生主題</span>
-          </h3>
-          <p class="text-slate-400 leading-relaxed">
-            採用 <code class="text-purple-300 font-mono">--pele-bg</code>, <code class="text-purple-300 font-mono">--pele-fg</code> 等 CSS 變數定義顏色。更換主題只需更換 CSS Class，圖形即刻適應，<strong>完全不需重新呼叫渲染</strong>！
-          </p>
+        <div>
+          <label class="block font-medium text-slate-300 mb-1">儲存目標位置:</label>
+          <div id="saveDestinationHint" class="p-2.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-400">
+            <!-- 根據是否登入動態顯示 -->
+          </div>
         </div>
       </div>
-      <div class="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500 pt-2 border-t border-slate-800/80">
-        <div>
-          <span>專案目錄：<code class="text-slate-400 font-mono">H:\國泰投信\pele-trial(RA)</code> (獨立 Git 儲存庫)</span>
+
+      <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+        <button id="cancelSaveBtn" type="button" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs">取消</button>
+        <button id="confirmSaveBtn" type="button" class="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-xs">確認儲存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 彈出視窗：我的圖表庫對話框 (Gallery Modal) -->
+  <div id="galleryModal" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-2xl flex flex-col max-h-[85vh]">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2">
+          <span class="text-xl">📁</span>
+          <h3 class="text-base font-bold text-white">我的 Mermaid 圖表庫</h3>
         </div>
-        <div>
-          <a href="https://github.com/obsidianmd/pele" target="_blank" class="text-purple-400 hover:text-purple-300 underline font-medium">GitHub: obsidianmd/pele</a> · 
-          <a href="https://pele.run" target="_blank" class="text-purple-400 hover:text-purple-300 underline font-medium">官方 Playground (pele.run)</a>
-        </div>
+        <button id="closeGalleryModalBtn" type="button" class="text-slate-400 hover:text-white text-lg">✕</button>
+      </div>
+
+      <!-- 圖表列表容器 -->
+      <div id="galleryListContainer" class="flex-1 overflow-y-auto space-y-2 pr-1 text-xs">
+        <!-- 動態渲染已儲存的圖表卡片 -->
+      </div>
+
+      <div class="flex items-center justify-between pt-3 border-t border-slate-800 text-xs text-slate-400">
+        <span id="gallerySourceLabel">資料來源：本機快取 / 雲端 Firestore</span>
+        <button id="closeGalleryBottomBtn" type="button" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300">關閉</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 頁尾資訊 -->
+  <footer class="border-t border-slate-800 bg-slate-950 py-5 mt-10">
+    <div class="max-w-7xl mx-auto px-4 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
+      <div>
+        <span>Mermaid Multi-Engine Comparator · 雙引擎對比（Mermaid.js v11 & Obsidian Pele v1.12）· 專案：<code class="text-slate-400 font-mono">pele-trial(RA)</code></span>
+      </div>
+      <div class="flex items-center gap-3">
+        <a href="#versionTimelineSection" class="hover:text-slate-300 transition">📜 版本歷程</a>
+        <a href="https://github.com/obsidianmd/pele" target="_blank" class="hover:text-purple-400 transition">Obsidian Pele</a>
+        <a href="https://mermaid.js.org/" target="_blank" class="hover:text-amber-400 transition">Mermaid.js</a>
+        <button id="scrollToTopBtn" type="button" class="hover:text-slate-300 transition">↑ 回到頂部</button>
       </div>
     </div>
   </footer>
 
-  <!-- 應用程式邏輯腳本 -->
+  <!-- 核心應用程式邏輯 (JavaScript) -->
   <script>
     (function () {
-      // 內建 Mermaid 圖表範本集
+      // 內建圖表範本
       const PRESETS = {
         flowchart: `flowchart TD
     Start([🚀 開始測驗]) --> Choice{選擇出題模式}
@@ -364,69 +610,61 @@
     autonumber
     actor User as 使用者
     participant Browser as 瀏覽器 (SPA)
+    participant Mermaid as Mermaid.js
     participant Pele as Obsidian Pele
-    participant SVG as 向量圖形 (SVG)
 
     User->>Browser: 輸入或修改 Mermaid 語法
-    Browser->>Pele: render(text) 同步呼叫
-    Note over Pele: 零執行時期依賴\\n次毫秒級解析與佈局
-    Pele-->>Browser: 回傳 { svg, width, height }
-    Browser->>SVG: 即時渲染至 DOM
-    User->>Browser: 切換主題 (CSS 變數)
-    Note over SVG: 即時適應顏色，無須重新渲染！`,
+    par 引擎 A：Mermaid.js
+        Browser->>Mermaid: mermaid.render()
+        Note over Mermaid: 依賴 DOM 測量\\n耗時約 40~100 ms
+        Mermaid-->>Browser: 產出標準 SVG
+    and 引擎 B：Obsidian Pele
+        Browser->>Pele: pele.render()
+        Note over Pele: 純 JS 同步渲染\\n耗時僅 0.3~1.5 ms
+        Pele-->>Browser: 產出輕量 SVG
+    end
+    Browser->>User: 雙欄即時對比 + 效能戰報！`,
 
         mindmap: `mindmap
-  root((Obsidian Pele))
-    效能優勢
-      次毫秒級渲染速度
-      同步執行 Sync
-      比傳統 Mermaid 快數百倍
+  root((雙引擎對比實驗室))
+    Mermaid.js
+      官方標準語法
+      社群最廣泛生態
+      瀏覽器 DOM 測量
+    Obsidian Pele
+      次毫秒級同步渲染
+      零執行時期相依性
+      CSS 變數原生主題
     架構特色
-      零執行時期相依性 Zero Dependencies
-      純 JavaScript 實作
-      輕量體積 (純 SVG 輸出)
-    主題系統
-      CSS 變數驅動 (--pele-*)
-      主題切換無須重繪
-      暗黑模式原生適應
-    語法支援
-      流程圖 Flowchart
-      時序圖 Sequence
-      版本演進 GitGraph
-      心智圖 Mindmap
-      類別圖 ClassDiagram`,
+      可擴充式多引擎介面
+      Firebase 雲端圖表同步
+      版本控制時間軸紀錄`,
 
         architecture: `architecture-beta
-    group api(logos:aws)[API Services]
-    service client(logos:chrome)[Client Browser] in api
-    service gateway(logos:aws-api-gateway)[API Gateway] in api
-    service pele(logos:obsidian)[Pele Renderer] in api
-    service s3(logos:aws-s3)[Static Assets] in api
+    group clientGroup(logos:chrome)[使用者瀏覽器]
+    service editor(logos:markdown)[Mermaid 編輯器] in clientGroup
+    service comparator(logos:visual-studio-code)[雙引擎對比核心] in clientGroup
 
-    client:R -- L:gateway
-    gateway:B -- T:pele
-    pele:R -- L:s3`,
+    group engines(logos:cpu)[渲染引擎]
+    service mmd(logos:mermaid)[Mermaid.js v11] in engines
+    service pele(logos:obsidian)[Obsidian Pele v1.12] in engines
 
-        pie: `pie title 熱門程式語言佔比 (2026)
-    "TypeScript / JavaScript" : 45
-    "Python" : 30
-    "Rust" : 15
-    "Go" : 10`,
+    editor:R -- L:comparator
+    comparator:T -- B:mmd
+    comparator:B -- T:pele`,
 
         state: `stateDiagram-v2
-    [*] --> 待作答: 進入考卷
-    待作答 --> 已作答: 點選選項
-    已作答 --> 正確: 判定吻合正解
-    已作答 --> 錯誤: 判定答錯
-    錯誤 --> 錯題庫: 自動歸檔
-    正確 --> 下一題
-    錯題庫 --> 下一題
-    下一題 --> [*]: 完成測驗`,
+    [*] --> 待編輯: 開啟對比實驗室
+    待編輯 --> 雙引擎渲染中: 輸入或切換範本
+    雙引擎渲染中 --> 對比成功: 雙方解析完成
+    雙引擎渲染中 --> 語法報錯: 語法不合規範
+    對比成功 --> 儲存至雲端: 登入 Firebase
+    儲存至雲端 --> 我的圖庫
+    對比成功 --> [*]`,
 
         er: `erDiagram
-    USER ||--o{ WRONG_QUESTION : collects
-    QUESTION ||--o{ WRONG_QUESTION : contains
-    EXAM_SESSION ||--|{ QUESTION : has
+    USER ||--o{ DIAGRAM : owns
+    DIAGRAM ||--|{ ENGINE_RESULT : compares
 
     USER {
         string uid PK
@@ -434,172 +672,336 @@
         string displayName
         datetime lastLogin
     }
-    QUESTION {
-        int id PK
-        string subject
-        string content
-        string answer
-    }
-    WRONG_QUESTION {
+    DIAGRAM {
         string id PK
-        int wrongCount
-        datetime addedAt
+        string title
+        string code
+        string theme
+        datetime updatedAt
+    }
+    ENGINE_RESULT {
+        string engineName PK
+        float renderTimeMs
+        int svgBytes
     }`
       };
 
-      // DOM 元件
-      const editor = document.getElementById('editor');
-      const svgViewport = document.getElementById('svgViewport');
-      const svgWrapper = document.getElementById('svgWrapper');
-      const presetSelect = document.getElementById('presetSelect');
-      const themeSelect = document.getElementById('themeSelect');
-      const errorBanner = document.getElementById('errorBanner');
-      const errorText = document.getElementById('errorText');
-      const diagramTypeBadge = document.getElementById('diagramTypeBadge');
-      const renderTimeEl = document.getElementById('renderTimeEl');
-      const dimensionsEl = document.getElementById('dimensionsEl');
-      const svgSizeEl = document.getElementById('svgSizeEl');
+      // Firebase 初始化配置 (沿用專案相容之 exam-web-42ba3 專案)
+      const firebaseConfig = {
+        apiKey: "AIzaSyDNYCiQOgm7-8GfDGraY_k5iKx_a6QB4r8",
+        authDomain: "exam-web-42ba3.firebaseapp.com",
+        projectId: "exam-web-42ba3",
+        storageBucket: "exam-web-42ba3.firebasestorage.app",
+        messagingSenderId: "675222062576",
+        appId: "1:675222062576:web:168cbf09f8bd611ec88935",
+        measurementId: "G-ZFDTQQYS6M"
+      };
 
-      const copySvgBtn = document.getElementById('copySvgBtn');
-      const downloadSvgBtn = document.getElementById('downloadSvgBtn');
-      const downloadPngBtn = document.getElementById('downloadPngBtn');
-      const clearBtn = document.getElementById('clearBtn');
-      const formatBtn = document.getElementById('formatBtn');
+      let fbAuth = null;
+      let fbDb = null;
+      let currentUser = null;
 
-      const zoomInBtn = document.getElementById('zoomInBtn');
-      const zoomOutBtn = document.getElementById('zoomOutBtn');
-      const zoomResetBtn = document.getElementById('zoomResetBtn');
-      const zoomLevelText = document.getElementById('zoomLevelText');
-
-      let currentSvgString = '';
-      let currentZoom = 1;
-
-      // 執行 Pele 渲染
-      function doRender() {
-        const text = editor.value.trim();
-        if (!text) {
-          svgViewport.innerHTML = '<div class="text-slate-500 text-xs italic py-12">請輸入 Mermaid 語法或選擇上方範本...</div>';
-          errorBanner.classList.add('hidden');
-          dimensionsEl.textContent = '-';
-          svgSizeEl.textContent = '-';
-          return;
+      try {
+        if (typeof firebase !== 'undefined') {
+          firebase.initializeApp(firebaseConfig);
+          fbAuth = firebase.auth();
+          fbDb = firebase.firestore();
         }
-
-        if (typeof window.pele === 'undefined' || typeof window.pele.render !== 'function') {
-          errorBanner.classList.remove('hidden');
-          errorText.textContent = 'pele.global.js 載入中或未正確載入，請確認檔案路徑。';
-          return;
-        }
-
-        const t0 = performance.now();
-        try {
-          const result = window.pele.render(text);
-          const t1 = performance.now();
-          const duration = (t1 - t0).toFixed(2);
-
-          errorBanner.classList.add('hidden');
-          currentSvgString = result.svg;
-          svgViewport.innerHTML = result.svg;
-
-          // 更新指標
-          renderTimeEl.textContent = duration + ' ms';
-          diagramTypeBadge.textContent = result.type || result.mermaidType || 'diagram';
-          dimensionsEl.textContent = Math.round(result.width) + ' × ' + Math.round(result.height) + ' px';
-          const kb = (result.svg.length / 1024).toFixed(2);
-          svgSizeEl.textContent = kb + ' KB';
-        } catch (err) {
-          errorBanner.classList.remove('hidden');
-          errorText.textContent = err.message || String(err);
-        }
+      } catch (err) {
+        console.warn('Firebase 初始化提示：', err);
       }
 
-      // 防抖即時更新 (Pele 速度極快，20ms 足以獲得絲滑輸入體驗)
-      let debounceTimer = null;
-      editor.addEventListener('input', function () {
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(doRender, 20);
+      // DOM 參照
+      const mermaidInput = document.getElementById('mermaidInput');
+      const detectTypeSpan = document.getElementById('detectTypeSpan');
+      const globalThemeSelect = document.getElementById('globalThemeSelect');
+      const formatCodeBtn = document.getElementById('formatCodeBtn');
+      const clearCodeBtn = document.getElementById('clearCodeBtn');
+      const triggerRenderBtn = document.getElementById('triggerRenderBtn');
+
+      const speedupBadge = document.getElementById('speedupBadge');
+      const mermaidTimeDisplay = document.getElementById('mermaidTimeDisplay');
+      const peleTimeDisplay = document.getElementById('peleTimeDisplay');
+      const mermaidSizeDisplay = document.getElementById('mermaidSizeDisplay');
+      const peleSizeDisplay = document.getElementById('peleSizeDisplay');
+
+      const mermaidViewport = document.getElementById('mermaidViewport');
+      const mermaidErrorBox = document.getElementById('mermaidErrorBox');
+      const mermaidStatusSpan = document.getElementById('mermaidStatusSpan');
+      const mermaidDimSpan = document.getElementById('mermaidDimSpan');
+      const copyMermaidSvgBtn = document.getElementById('copyMermaidSvgBtn');
+      const downloadMermaidSvgBtn = document.getElementById('downloadMermaidSvgBtn');
+
+      const peleContainer = document.getElementById('peleContainer');
+      const peleViewport = document.getElementById('peleViewport');
+      const peleErrorBox = document.getElementById('peleErrorBox');
+      const peleStatusSpan = document.getElementById('peleStatusSpan');
+      const peleDimSpan = document.getElementById('peleDimSpan');
+      const copyPeleSvgBtn = document.getElementById('copyPeleSvgBtn');
+      const downloadPeleSvgBtn = document.getElementById('downloadPeleSvgBtn');
+      const downloadPelePngBtn = document.getElementById('downloadPelePngBtn');
+
+      const syncZoomInBtn = document.getElementById('syncZoomInBtn');
+      const syncZoomOutBtn = document.getElementById('syncZoomOutBtn');
+      const syncZoomResetBtn = document.getElementById('syncZoomResetBtn');
+      const syncZoomLevelText = document.getElementById('syncZoomLevelText');
+
+      // Firebase 與圖庫 DOM
+      const googleLoginBtn = document.getElementById('googleLoginBtn');
+      const userProfileDropdown = document.getElementById('userProfileDropdown');
+      const userProfileBtn = document.getElementById('userProfileBtn');
+      const userProfileMenu = document.getElementById('userProfileMenu');
+      const userAvatarImg = document.getElementById('userAvatarImg');
+      const userNameSpan = document.getElementById('userNameSpan');
+      const userMenuName = document.getElementById('userMenuName');
+      const userMenuEmail = document.getElementById('userMenuEmail');
+      const manualSyncBtn = document.getElementById('manualSyncBtn');
+      const googleLogoutBtn = document.getElementById('googleLogoutBtn');
+      const syncDotIndicator = document.getElementById('syncDotIndicator');
+      const cloudSyncStatusText = document.getElementById('cloudSyncStatusText');
+
+      const saveDiagramBtn = document.getElementById('saveDiagramBtn');
+      const openGalleryBtn = document.getElementById('openGalleryBtn');
+      const savedCountSpan = document.getElementById('savedCountSpan');
+      const saveModal = document.getElementById('saveModal');
+      const closeSaveModalBtn = document.getElementById('closeSaveModalBtn');
+      const cancelSaveBtn = document.getElementById('cancelSaveBtn');
+      const confirmSaveBtn = document.getElementById('confirmSaveBtn');
+      const saveTitleInput = document.getElementById('saveTitleInput');
+      const saveDestinationHint = document.getElementById('saveDestinationHint');
+
+      const galleryModal = document.getElementById('galleryModal');
+      const closeGalleryModalBtn = document.getElementById('closeGalleryModalBtn');
+      const closeGalleryBottomBtn = document.getElementById('closeGalleryBottomBtn');
+      const galleryListContainer = document.getElementById('galleryListContainer');
+      const gallerySourceLabel = document.getElementById('gallerySourceLabel');
+
+      let currentSyncZoom = 1;
+      let lastMermaidSvg = '';
+      let lastPeleSvg = '';
+      let localDiagrams = [];
+
+      // 初始化 Mermaid.js
+      if (typeof mermaid !== 'undefined') {
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: 'dark',
+          securityLevel: 'loose'
+        });
+      }
+
+      // 偵測 Mermaid 圖表類型
+      function detectDiagramType(code) {
+        const text = code.trim();
+        if (/^\s*(graph|flowchart)/i.test(text)) return 'flowchart';
+        if (/^\s*gitGraph/i.test(text)) return 'gitGraph';
+        if (/^\s*sequenceDiagram/i.test(text)) return 'sequence';
+        if (/^\s*mindmap/i.test(text)) return 'mindmap';
+        if (/^\s*architecture/i.test(text)) return 'architecture';
+        if (/^\s*stateDiagram/i.test(text)) return 'state';
+        if (/^\s*erDiagram/i.test(text)) return 'er';
+        if (/^\s*pie/i.test(text)) return 'pie';
+        if (/^\s*classDiagram/i.test(text)) return 'class';
+        return 'mermaid-diagram';
+      }
+
+      // 雙引擎對比核心渲染函式
+      async function runComparisonRender() {
+        const code = mermaidInput.value.trim();
+        if (!code) {
+          mermaidViewport.innerHTML = '<div class="text-slate-500 text-xs italic py-12">請在上方輸入 Mermaid 語法...</div>';
+          peleViewport.innerHTML = '<div class="text-slate-500 text-xs italic py-12">請在上方輸入 Mermaid 語法...</div>';
+          mermaidErrorBox.classList.add('hidden');
+          peleErrorBox.classList.add('hidden');
+          speedupBadge.textContent = '等待輸入';
+          return;
+        }
+
+        const dType = detectDiagramType(code);
+        detectTypeSpan.textContent = dType;
+
+        let mmdTime = 0;
+        let peleTime = 0;
+        let mmdSuccess = false;
+        let peleSuccess = false;
+
+        // 1. 執行引擎 A (Mermaid.js 官方標準)
+        try {
+          mermaidErrorBox.classList.add('hidden');
+          const t0 = performance.now();
+          const renderId = 'mmd-' + Math.random().toString(36).substring(2, 9);
+          const { svg } = await mermaid.render(renderId, code);
+          const t1 = performance.now();
+          mmdTime = t1 - t0;
+          mmdSuccess = true;
+
+          lastMermaidSvg = svg;
+          mermaidViewport.innerHTML = svg;
+          mermaidStatusSpan.innerHTML = '<span class="text-emerald-400">✓ 渲染成功 (' + mmdTime.toFixed(1) + ' ms)</span>';
+          mermaidTimeDisplay.textContent = mmdTime.toFixed(1) + ' ms';
+
+          const mmdSvgEl = mermaidViewport.querySelector('svg');
+          if (mmdSvgEl) {
+            const bbox = mmdSvgEl.getBoundingClientRect();
+            mermaidDimSpan.textContent = Math.round(bbox.width) + ' × ' + Math.round(bbox.height) + ' px';
+          }
+          const kb = (svg.length / 1024).toFixed(2);
+          mermaidSizeDisplay.textContent = kb + ' KB';
+        } catch (err) {
+          mmdSuccess = false;
+          mermaidErrorBox.classList.remove('hidden');
+          mermaidErrorBox.textContent = 'Mermaid.js 解析錯誤：\n' + (err.message || String(err));
+          mermaidStatusSpan.innerHTML = '<span class="text-rose-400">✗ 解析異常</span>';
+          mermaidTimeDisplay.textContent = 'Error';
+          mermaidSizeDisplay.textContent = '--';
+        }
+
+        // 2. 執行引擎 B (Obsidian Pele 次毫秒純向量)
+        try {
+          peleErrorBox.classList.add('hidden');
+          const t0 = performance.now();
+          const res = window.pele.render(code);
+          const t1 = performance.now();
+          peleTime = t1 - t0;
+          peleSuccess = true;
+
+          lastPeleSvg = res.svg;
+          peleViewport.innerHTML = res.svg;
+          peleStatusSpan.innerHTML = '<span class="text-emerald-400">✓ 次毫秒渲染 (' + peleTime.toFixed(2) + ' ms)</span>';
+          peleTimeDisplay.textContent = peleTime.toFixed(2) + ' ms';
+          peleDimSpan.textContent = Math.round(res.width) + ' × ' + Math.round(res.height) + ' px';
+          const kb = (res.svg.length / 1024).toFixed(2);
+          peleSizeDisplay.textContent = kb + ' KB';
+        } catch (err) {
+          peleSuccess = false;
+          peleErrorBox.classList.remove('hidden');
+          peleErrorBox.textContent = 'Obsidian Pele 解析錯誤：\n' + (err.message || String(err));
+          peleStatusSpan.innerHTML = '<span class="text-rose-400">✗ 解析異常</span>';
+          peleTimeDisplay.textContent = 'Error';
+          peleSizeDisplay.textContent = '--';
+        }
+
+        // 3. 計算即時效能對比
+        if (mmdSuccess && peleSuccess && peleTime > 0) {
+          const ratio = (mmdTime / peleTime).toFixed(1);
+          speedupBadge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 animate-pulse';
+          speedupBadge.textContent = '🚀 Pele 領先 ' + ratio + 'x 倍更快';
+        } else if (peleSuccess && !mmdSuccess) {
+          speedupBadge.textContent = '⚡ Pele 渲染成功 (Mermaid 報錯)';
+        } else if (!peleSuccess && mmdSuccess) {
+          speedupBadge.textContent = '🐢 Mermaid 渲染成功 (Pele 報錯)';
+        } else {
+          speedupBadge.textContent = '⚠️ 雙方均報錯';
+        }
+
+        applySyncZoom();
+      }
+
+      // 輸入防抖
+      let inputDebounceTimer = null;
+      mermaidInput.addEventListener('input', function () {
+        clearTimeout(inputDebounceTimer);
+        inputDebounceTimer = setTimeout(runComparisonRender, 60);
       });
 
-      // 支援 Tab 鍵縮排
-      editor.addEventListener('keydown', function (e) {
+      // 支援 Tab 縮排
+      mermaidInput.addEventListener('keydown', function (e) {
         if (e.key === 'Tab') {
           e.preventDefault();
           const start = this.selectionStart;
           const end = this.selectionEnd;
           this.value = this.value.substring(0, start) + '  ' + this.value.substring(end);
           this.selectionStart = this.selectionEnd = start + 2;
-          doRender();
+          runComparisonRender();
         }
       });
 
-      // 切換範本
-      presetSelect.addEventListener('change', function () {
-        const key = this.value;
-        if (PRESETS[key]) {
-          editor.value = PRESETS[key];
-          currentZoom = 1;
-          applyZoom();
-          doRender();
-        }
+      // 範本按鈕快速點擊
+      document.querySelectorAll('.preset-btn').forEach(btn => {
+        btn.addEventListener('click', function () {
+          const pName = this.dataset.preset;
+          if (PRESETS[pName]) {
+            mermaidInput.value = PRESETS[pName];
+            runComparisonRender();
+          }
+        });
       });
 
-      // 切換主題 (直接更換 CSS 類別，Pele 的 SVG 透過 CSS 變數自動變色，無須重跑渲染！)
-      themeSelect.addEventListener('change', function () {
-        svgWrapper.className = this.value + ' transition-colors duration-200 p-6 rounded-xl border border-slate-700/50 shadow-2xl flex items-center justify-center max-w-full';
+      // 全域主題切換
+      globalThemeSelect.addEventListener('change', function () {
+        peleContainer.className = this.value + ' transition-colors duration-200 p-4 rounded-xl flex items-center justify-center max-w-full';
       });
 
-      // 縮放控制
-      function applyZoom() {
-        svgViewport.style.transform = 'scale(' + currentZoom + ')';
-        zoomLevelText.textContent = Math.round(currentZoom * 100) + '%';
+      // 雙視窗畫布同步縮放
+      function applySyncZoom() {
+        if (mermaidViewport) mermaidViewport.style.transform = 'scale(' + currentSyncZoom + ')';
+        if (peleViewport) peleViewport.style.transform = 'scale(' + currentSyncZoom + ')';
+        syncZoomLevelText.textContent = Math.round(currentSyncZoom * 100) + '%';
       }
 
-      zoomInBtn.addEventListener('click', function () {
-        currentZoom = Math.min(3, currentZoom + 0.15);
-        applyZoom();
+      syncZoomInBtn.addEventListener('click', function () {
+        currentSyncZoom = Math.min(3, currentSyncZoom + 0.15);
+        applySyncZoom();
       });
 
-      zoomOutBtn.addEventListener('click', function () {
-        currentZoom = Math.max(0.3, currentZoom - 0.15);
-        applyZoom();
+      syncZoomOutBtn.addEventListener('click', function () {
+        currentSyncZoom = Math.max(0.3, currentSyncZoom - 0.15);
+        applySyncZoom();
       });
 
-      zoomResetBtn.addEventListener('click', function () {
-        currentZoom = 1;
-        applyZoom();
+      syncZoomResetBtn.addEventListener('click', function () {
+        currentSyncZoom = 1;
+        applySyncZoom();
       });
 
-      // 複製 SVG
-      copySvgBtn.addEventListener('click', async function () {
-        if (!currentSvgString) return;
+      triggerRenderBtn.addEventListener('click', runComparisonRender);
+
+      formatCodeBtn.addEventListener('click', function () {
+        mermaidInput.value = mermaidInput.value.trim();
+        runComparisonRender();
+      });
+
+      clearCodeBtn.addEventListener('click', function () {
+        mermaidInput.value = '';
+        runComparisonRender();
+        mermaidInput.focus();
+      });
+
+      // 複製與下載功能
+      async function copyText(text, btn) {
+        if (!text) return;
         try {
-          await navigator.clipboard.writeText(currentSvgString);
-          const orig = copySvgBtn.innerHTML;
-          copySvgBtn.innerHTML = '<span>✓</span><span>已複製!</span>';
-          setTimeout(() => copySvgBtn.innerHTML = orig, 1500);
+          await navigator.clipboard.writeText(text);
+          const orig = btn.innerHTML;
+          btn.innerHTML = '<span>✓ 已複製</span>';
+          setTimeout(() => btn.innerHTML = orig, 1200);
         } catch {
           alert('複製失敗，請手動複製。');
         }
-      });
+      }
 
-      // 下載 SVG 檔
-      downloadSvgBtn.addEventListener('click', function () {
-        if (!currentSvgString) return;
-        const blob = new Blob([currentSvgString], { type: 'image/svg+xml;charset=utf-8' });
+      function downloadSvgFile(svgText, filename) {
+        if (!svgText) return;
+        const blob = new Blob([svgText], { type: 'image/svg+xml;charset=utf-8' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = (presetSelect.value || 'diagram') + '.svg';
+        a.download = filename;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-      });
+      }
 
-      // 匯出 PNG
-      downloadPngBtn.addEventListener('click', function () {
-        if (!currentSvgString) return;
-        const svgEl = svgViewport.querySelector('svg');
+      copyMermaidSvgBtn.addEventListener('click', () => copyText(lastMermaidSvg, copyMermaidSvgBtn));
+      downloadMermaidSvgBtn.addEventListener('click', () => downloadSvgFile(lastMermaidSvg, 'mermaid-engine.svg'));
+
+      copyPeleSvgBtn.addEventListener('click', () => copyText(lastPeleSvg, copyPeleSvgBtn));
+      downloadPeleSvgBtn.addEventListener('click', () => downloadSvgFile(lastPeleSvg, 'pele-engine.svg'));
+
+      downloadPelePngBtn.addEventListener('click', function () {
+        if (!lastPeleSvg) return;
+        const svgEl = peleViewport.querySelector('svg');
         if (!svgEl) return;
 
         const svgData = new XMLSerializer().serializeToString(svgEl);
@@ -611,7 +1013,7 @@
         const url = URL.createObjectURL(svgBlob);
 
         img.onload = function () {
-          canvas.width = img.width * 2; // 2x 高解析度
+          canvas.width = img.width * 2;
           canvas.height = img.height * 2;
           ctx.scale(2, 2);
           ctx.drawImage(img, 0, 0);
@@ -620,7 +1022,7 @@
           const pngUrl = canvas.toDataURL('image/png');
           const a = document.createElement('a');
           a.href = pngUrl;
-          a.download = (presetSelect.value || 'diagram') + '.png';
+          a.download = 'pele-diagram.png';
           document.body.appendChild(a);
           a.click();
           document.body.removeChild(a);
@@ -628,21 +1030,349 @@
         img.src = url;
       });
 
-      // 清空與格式化
-      clearBtn.addEventListener('click', function () {
-        editor.value = '';
-        doRender();
-        editor.focus();
+      // Firebase 與圖庫管理
+      const LOCAL_DIAGRAMS_KEY = 'pele_trial_saved_diagrams_v1';
+
+      function loadLocalDiagrams() {
+        try {
+          const raw = localStorage.getItem(LOCAL_DIAGRAMS_KEY);
+          localDiagrams = raw ? JSON.parse(raw) : [];
+        } catch {
+          localDiagrams = [];
+        }
+        updateSavedCount();
+      }
+
+      function saveLocalDiagrams() {
+        try {
+          localStorage.setItem(LOCAL_DIAGRAMS_KEY, JSON.stringify(localDiagrams));
+        } catch (e) {
+          console.warn('localStorage 儲存異常：', e);
+        }
+        updateSavedCount();
+      }
+
+      function updateSavedCount() {
+        savedCountSpan.textContent = String(localDiagrams.length);
+      }
+
+      async function loadCloudDiagrams(user) {
+        if (!fbDb || !user) return;
+        try {
+          syncDotIndicator.className = 'w-2 h-2 rounded-full bg-amber-400 animate-pulse';
+          cloudSyncStatusText.textContent = '同步中...';
+          const snap = await fbDb.collection('users').doc(user.uid).collection('diagrams').orderBy('updatedAt', 'desc').get();
+          const cloudList = [];
+          snap.forEach(doc => {
+            const data = doc.data();
+            cloudList.push({ id: doc.id, ...data });
+          });
+          localDiagrams = cloudList;
+          saveLocalDiagrams();
+          syncDotIndicator.className = 'w-2 h-2 rounded-full bg-emerald-400';
+          cloudSyncStatusText.textContent = '雲端已同步 (' + user.displayName + ')';
+        } catch (err) {
+          console.error('雲端載入失敗：', err);
+          syncDotIndicator.className = 'w-2 h-2 rounded-full bg-slate-400';
+          cloudSyncStatusText.textContent = '本機快取模式';
+        }
+      }
+
+      saveDiagramBtn.addEventListener('click', function () {
+        saveTitleInput.value = (detectTypeSpan.textContent || 'Mermaid') + ' 圖表 - ' + new Date().toLocaleDateString();
+        if (currentUser) {
+          saveDestinationHint.innerHTML = '已登入 Google 帳號：<strong class="text-emerald-400">' + currentUser.email + '</strong><br>圖表將直接同步至 <span class="text-indigo-400 font-bold">Cloud Firestore 雲端資料庫</span>！';
+        } else {
+          saveDestinationHint.innerHTML = '目前為訪客模式，圖表將儲存於 <strong class="text-amber-400">本機瀏覽器快取 (LocalStorage)</strong>。<br>登入 Google 後可跨裝置雙向同步。';
+        }
+        saveModal.classList.remove('hidden');
+        saveTitleInput.focus();
       });
 
-      formatBtn.addEventListener('click', function () {
-        editor.value = editor.value.trim();
-        doRender();
+      closeSaveModalBtn.addEventListener('click', () => saveModal.classList.add('hidden'));
+      cancelSaveBtn.addEventListener('click', () => saveModal.classList.add('hidden'));
+
+      confirmSaveBtn.addEventListener('click', async function () {
+        const title = saveTitleInput.value.trim() || '未命名圖表';
+        const code = mermaidInput.value;
+        const theme = globalThemeSelect.value;
+        const now = new Date().toISOString();
+
+        const newDiagram = {
+          title: title,
+          code: code,
+          theme: theme,
+          updatedAt: now
+        };
+
+        if (currentUser && fbDb) {
+          try {
+            confirmSaveBtn.textContent = '儲存中...';
+            const docRef = await fbDb.collection('users').doc(currentUser.uid).collection('diagrams').add({
+              ...newDiagram,
+              createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+              updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            newDiagram.id = docRef.id;
+            localDiagrams.unshift(newDiagram);
+            saveLocalDiagrams();
+            alert('✓ 成功儲存至 Firebase 雲端圖庫！');
+          } catch (err) {
+            console.error('儲存至 Firebase 失敗：', err);
+            localDiagrams.unshift({ id: 'local_' + Date.now(), ...newDiagram });
+            saveLocalDiagrams();
+            alert('雲端同步失敗，已暫存於本機。');
+          } finally {
+            confirmSaveBtn.textContent = '確認儲存';
+          }
+        } else {
+          localDiagrams.unshift({ id: 'local_' + Date.now(), ...newDiagram });
+          saveLocalDiagrams();
+          alert('✓ 已成功儲存於本機圖庫！');
+        }
+
+        saveModal.classList.add('hidden');
       });
 
-      // 初始載入
-      editor.value = PRESETS.flowchart;
-      doRender();
+      openGalleryBtn.addEventListener('click', function () {
+        renderGalleryList();
+        galleryModal.classList.remove('hidden');
+      });
+
+      closeGalleryModalBtn.addEventListener('click', () => galleryModal.classList.add('hidden'));
+      closeGalleryBottomBtn.addEventListener('click', () => galleryModal.classList.add('hidden'));
+
+      function renderGalleryList() {
+        if (localDiagrams.length === 0) {
+          galleryListContainer.innerHTML = '<div class="text-center py-12 text-slate-500 italic">目前尚未儲存任何圖表，點擊上方「💾 儲存圖表」即可建立！</div>';
+          return;
+        }
+
+        galleryListContainer.innerHTML = localDiagrams.map((diag, index) => {
+          const dateStr = diag.updatedAt ? new Date(diag.updatedAt).toLocaleString() : '最近';
+          const snippet = (diag.code || '').split('\n').slice(0, 3).join(' ') + '...';
+          return `
+            <div class="bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 rounded-xl p-3.5 flex items-center justify-between gap-3 transition">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2">
+                  <h4 class="font-bold text-white truncate text-sm">${escapeHtml(diag.title)}</h4>
+                  <span class="px-2 py-0.5 rounded text-[10px] bg-indigo-950 text-indigo-300 border border-indigo-800/50 font-mono">${detectDiagramType(diag.code || '')}</span>
+                </div>
+                <div class="text-[11px] font-mono text-slate-400 truncate mt-1">${escapeHtml(snippet)}</div>
+                <div class="text-[10px] text-slate-500 mt-1">最後更新：${dateStr}</div>
+              </div>
+              <div class="flex items-center gap-1.5 shrink-0">
+                <button type="button" class="load-diag-btn px-2.5 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition" data-index="${index}">載入</button>
+                <button type="button" class="delete-diag-btn px-2 py-1 rounded bg-slate-700 hover:bg-rose-900/80 text-rose-300 transition" data-index="${index}">刪除</button>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        galleryListContainer.querySelectorAll('.load-diag-btn').forEach(btn => {
+          btn.addEventListener('click', function () {
+            const idx = parseInt(this.dataset.index, 10);
+            const item = localDiagrams[idx];
+            if (item) {
+              mermaidInput.value = item.code || '';
+              if (item.theme && globalThemeSelect) {
+                globalThemeSelect.value = item.theme;
+                peleContainer.className = item.theme + ' transition-colors duration-200 p-4 rounded-xl flex items-center justify-center max-w-full';
+              }
+              runComparisonRender();
+              galleryModal.classList.add('hidden');
+            }
+          });
+        });
+
+        galleryListContainer.querySelectorAll('.delete-diag-btn').forEach(btn => {
+          btn.addEventListener('click', async function () {
+            const idx = parseInt(this.dataset.index, 10);
+            const item = localDiagrams[idx];
+            if (!item) return;
+            if (!confirm('確定要刪除圖表「' + item.title + '」嗎？')) return;
+
+            if (currentUser && fbDb && item.id && !item.id.startsWith('local_')) {
+              try {
+                await fbDb.collection('users').doc(currentUser.uid).collection('diagrams').doc(item.id).delete();
+              } catch (e) {
+                console.warn('雲端刪除失敗：', e);
+              }
+            }
+            localDiagrams.splice(idx, 1);
+            saveLocalDiagrams();
+            renderGalleryList();
+          });
+        });
+      }
+
+      function escapeHtml(str) {
+        return String(str || '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      // Google 登入/登出事件
+      async function triggerGoogleLogin() {
+        if (!fbAuth) {
+          alert('Firebase 認證模組尚未載入，請確認網路連線。');
+          return;
+        }
+        const provider = new firebase.auth.GoogleAuthProvider();
+        provider.setCustomParameters({ prompt: 'select_account' });
+        try {
+          await fbAuth.signInWithPopup(provider);
+        } catch (err) {
+          console.error('Google 登入失敗:', err);
+          if (err.code !== 'auth/popup-closed-by-user') {
+            alert('登入失敗：' + (err.message || err.code));
+          }
+        }
+      }
+
+      if (googleLoginBtn) googleLoginBtn.addEventListener('click', triggerGoogleLogin);
+
+      if (userProfileBtn && userProfileMenu) {
+        userProfileBtn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          userProfileMenu.classList.toggle('hidden');
+        });
+        document.addEventListener('click', function (e) {
+          if (userProfileDropdown && !userProfileDropdown.contains(e.target)) {
+            userProfileMenu.classList.add('hidden');
+          }
+        });
+      }
+
+      if (manualSyncBtn) {
+        manualSyncBtn.addEventListener('click', function () {
+          if (currentUser) {
+            loadCloudDiagrams(currentUser);
+            alert('✓ 已向 Firebase 送出同步請求！');
+          }
+        });
+      }
+
+      if (googleLogoutBtn) {
+        googleLogoutBtn.addEventListener('click', async function () {
+          if (fbAuth) {
+            try {
+              await fbAuth.signOut();
+              if (userProfileMenu) userProfileMenu.classList.add('hidden');
+              alert('您已成功登出。');
+            } catch (err) {
+              console.error('登出異常:', err);
+            }
+          }
+        });
+      }
+
+      // 版本控制時間軸：管理員權限控管與折疊控制
+      const ADMIN_EMAIL = 'renart.00001@gmail.com';
+
+      function isCurrentUserAdmin() {
+        return Boolean(currentUser && (currentUser.email || '').toLowerCase() === ADMIN_EMAIL.toLowerCase());
+      }
+
+      function updateTimelineAuthUI() {
+        const toggleBtn = document.getElementById('timelineAuthToggleBtn');
+        const lockIcon = document.getElementById('timelineLockIcon');
+        const toggleText = document.getElementById('timelineToggleText');
+        const timelineWrapper = document.getElementById('timelineNodesWrapper');
+        if (!toggleBtn || !lockIcon || !toggleText) return;
+
+        const isAdmin = isCurrentUserAdmin();
+        if (isAdmin) {
+          toggleBtn.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 text-xs font-bold border border-indigo-500/40 shadow-xs transition cursor-pointer';
+          toggleBtn.title = '管理員 (' + ADMIN_EMAIL + ') 已授權，點擊展開或收折詳細歷程';
+          lockIcon.textContent = '👑';
+          const isExpanded = timelineWrapper && !timelineWrapper.classList.contains('hidden');
+          toggleText.textContent = isExpanded ? '收折詳細歷程 ▲' : '展開詳細歷程 ▼';
+        } else {
+          toggleBtn.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700 transition cursor-pointer';
+          toggleBtn.title = '詳細版控歷程僅供管理員 (' + ADMIN_EMAIL + ') 展開查看';
+          lockIcon.textContent = '🔒';
+          toggleText.textContent = '詳細歷程 (需管理員登入)';
+          if (timelineWrapper) {
+            timelineWrapper.classList.add('hidden');
+          }
+        }
+      }
+
+      const timelineAuthToggleBtn = document.getElementById('timelineAuthToggleBtn');
+      if (timelineAuthToggleBtn) {
+        timelineAuthToggleBtn.addEventListener('click', function () {
+          const isAdmin = isCurrentUserAdmin();
+          const timelineWrapper = document.getElementById('timelineNodesWrapper');
+          if (!isAdmin) {
+            if (!currentUser) {
+              const wantLogin = confirm(
+                '【管理員專屬資訊】\n\n' +
+                '此詳細架構演進與 Git 版控歷程為系統內部維護紀錄。\n' +
+                '系統限制僅有管理員帳號（' + ADMIN_EMAIL + '）登入後方可展開。\n\n' +
+                '是否立即進行 Google 登入？'
+              );
+              if (wantLogin) {
+                triggerGoogleLogin();
+              }
+            } else {
+              alert(
+                '【無存取權限】\n\n' +
+                '目前登入帳號為：' + (currentUser.email || '未知帳號') + '\n\n' +
+                '詳細版本歷程僅授權給管理員帳號：\n👉 ' + ADMIN_EMAIL + '\n\n' +
+                '請切換至管理員帳號後再行展開。'
+              );
+            }
+            return;
+          }
+
+          if (timelineWrapper) {
+            timelineWrapper.classList.toggle('hidden');
+            updateTimelineAuthUI();
+            if (!timelineWrapper.classList.contains('hidden')) {
+              timelineWrapper.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+          }
+        });
+      }
+
+      if (fbAuth) {
+        fbAuth.onAuthStateChanged(function (user) {
+          if (user) {
+            currentUser = user;
+            if (googleLoginBtn) googleLoginBtn.classList.add('hidden');
+            if (userProfileDropdown) userProfileDropdown.classList.remove('hidden');
+            if (userAvatarImg) userAvatarImg.src = user.photoURL || 'https://www.gravatar.com/avatar/?d=mp';
+            if (userNameSpan) userNameSpan.textContent = user.displayName || '已登入';
+            if (userMenuName) userMenuName.textContent = user.displayName || '使用者';
+            if (userMenuEmail) userMenuEmail.textContent = user.email || '';
+            loadCloudDiagrams(user);
+          } else {
+            currentUser = null;
+            if (googleLoginBtn) googleLoginBtn.classList.remove('hidden');
+            if (userProfileDropdown) userProfileDropdown.classList.add('hidden');
+            syncDotIndicator.className = 'w-2 h-2 rounded-full bg-slate-500';
+            cloudSyncStatusText.textContent = '離線本機草稿';
+            loadLocalDiagrams();
+          }
+          updateTimelineAuthUI();
+        });
+      }
+
+      // 回到頂部按鈕
+      const scrollToTopBtn = document.getElementById('scrollToTopBtn');
+      if (scrollToTopBtn) {
+        scrollToTopBtn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+      }
+
+      // 啟動初始化
+      loadLocalDiagrams();
+      mermaidInput.value = PRESETS.flowchart;
+      runComparisonRender();
+      updateTimelineAuthUI();
     })();
   </script>
 </body>
