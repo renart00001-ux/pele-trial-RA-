@@ -44,7 +44,7 @@
 gitGraph
     commit id: "c0e9cdd" tag: "v0.1.0"
     commit id: "106f6c9"
-    commit id: "initial-v1.0" tag: "v1.0.0"
+    commit id: "3df97f5" tag: "v1.0.0"
 ```
 
 ---
@@ -53,7 +53,7 @@ gitGraph
 
 | 版本 | 發布日期 | Commit Hash | 核心更新內容與重要成就 |
 | :--- | :--- | :--- | :--- |
-| **v1.0.0** | 2026-10-27 | *當前版本* | ⚖️ **雙引擎即時對比實驗室發布**：上方即時語法輸入、下方雙欄對比 (Mermaid.js vs Pele)、次毫秒效能戰報。<br>☁️ **Firebase 後台整合**：Google 帳號登入與 Cloud Firestore 個人圖庫儲存。<br>🔒 **管理員權限折疊**：版控時間軸限 `renart.00001@gmail.com` 展開。 |
+| **v1.0.0** | 2026-10-27 | `3df97f5` | ⚖️ **雙引擎即時對比實驗室發布**：上方即時語法輸入、下方雙欄對比 (Mermaid.js vs Pele)、次毫秒效能戰報。<br>☁️ **Firebase 後台整合**：Google 帳號登入與 Cloud Firestore 個人圖庫儲存。<br>🔒 **管理員權限折疊**：版控時間軸限 `renart.00001@gmail.com` 展開。 |
 | **v0.1.0** | 2026-10-27 | `c0e9cdd` | 💎 **專案初始化**：引入 Obsidian Pele 1.12.0 核心、建立 CLI 工具與效能壓測腳本。 |
 
 ---
