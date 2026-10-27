@@ -22,7 +22,7 @@
 ## 📂 專案檔案架構
 
 ```text
-pele-trial/
+pele-trial(RA)/
 ├── index.html          # 💎 Pele Interactive Studio (互動式圖表工作台與多主題切換)
 ├── pele.global.js      # 📦 Pele 1.12.0 獨立單檔瀏覽器端核心 (可 100% 離線運行)
 ├── render-cli.mjs      # 🛠️ Node.js CLI 工具：一行指令將 .mmd 轉為 .svg

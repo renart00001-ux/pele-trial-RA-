@@ -1,6 +1,6 @@
 ﻿{
     "version":  "1.0.0",
-    "name":  "pele-trial",
+    "name":  "pele-trial(ra)",
     "description":  "Obsidian Pele (Mermaid-to-SVG) Trial and Interactive Studio",
     "scripts":  {
                     "cli":  "node render-cli.mjs",
