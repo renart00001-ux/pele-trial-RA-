@@ -159,7 +159,7 @@
           <div class="flex items-center gap-2 flex-wrap">
             <h1 class="text-base sm:text-lg font-bold tracking-tight text-white flex items-center gap-2">
               <span>Mermaid 多引擎即時對比實驗室</span>
-              <span class="text-xs px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-mono">v1.0.0</span>
+              <span class="text-xs px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-mono">v1.1.0</span>
             </h1>
           </div>
           <p class="text-xs text-slate-400">Mermaid.js vs Obsidian Pele 雙引擎即時對照 · 次毫秒效能剖析 · Firebase 雲端圖庫</p>
@@ -332,11 +332,40 @@
       </div>
     </section>
 
+    <!-- 雙引擎畫布配置控制列 -->
+    <div class="flex flex-wrap items-center justify-between gap-3 bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-xs shadow-md">
+      <div class="flex items-center gap-2">
+        <span class="text-white font-bold flex items-center gap-1.5">
+          <span>⚖️</span><span>雙引擎對比版面:</span>
+        </span>
+        <span id="currentLayoutBadge" class="px-2 py-0.5 rounded text-[11px] font-mono bg-indigo-950 text-indigo-300 border border-indigo-800/40">
+          雙欄左右並列 (50% : 50%)
+        </span>
+      </div>
+
+      <div class="flex items-center gap-2 flex-wrap">
+        <!-- 版面切換按鈕群 -->
+        <div class="flex items-center gap-1 bg-slate-800 border border-slate-700 rounded-lg p-0.5">
+          <button id="layoutSideBySideBtn" type="button" class="px-3 py-1 rounded bg-indigo-600 text-white font-bold transition text-xs flex items-center gap-1.5 shadow-xs" title="雙引擎左右並列 (50% : 50%)">
+            <span>◫</span><span>左右並列</span>
+          </button>
+          <button id="layoutStackedBtn" type="button" class="px-3 py-1 rounded text-slate-300 hover:text-white hover:bg-slate-700 transition text-xs flex items-center gap-1.5" title="單欄上下堆疊顯示">
+            <span>☰</span><span>上下排列</span>
+          </button>
+        </div>
+
+        <!-- 寬屏延伸切換 -->
+        <button id="toggleWideModeBtn" type="button" class="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs font-medium transition flex items-center gap-1.5" title="切換寬螢幕全幅模式，享受超寬對比畫布">
+          <span>↔</span><span id="wideModeText">寬屏展開</span>
+        </button>
+      </div>
+    </div>
+
     <!-- 下方區塊：雙引擎圖示對比區塊 (可擴充式多引擎設計) -->
-    <section class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+    <section id="comparisonGrid" class="grid grid-cols-2 gap-4 items-stretch w-full transition-all duration-200">
 
       <!-- 左側圖示卡：Mermaid.js (官方標準引擎) -->
-      <div class="flex flex-col bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+      <div class="flex flex-col bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl min-w-0 w-full">
         
         <!-- 引擎標題列與工具列 -->
         <div class="bg-slate-850 px-4 py-2.5 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
@@ -377,7 +406,7 @@
       </div>
 
       <!-- 右側圖示卡：Obsidian Pele (次毫秒超速引擎) -->
-      <div class="flex flex-col bg-slate-900 border border-indigo-900/60 rounded-2xl overflow-hidden shadow-xl ring-1 ring-indigo-500/20">
+      <div class="flex flex-col bg-slate-900 border border-indigo-900/60 rounded-2xl overflow-hidden shadow-xl ring-1 ring-indigo-500/20 min-w-0 w-full">
         
         <!-- 引擎標題列與工具列 -->
         <div class="bg-slate-850 px-4 py-2.5 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
@@ -463,6 +492,39 @@
 
         <!-- 垂直時間軸主體 (左側垂直標記線) - 預設折疊 hidden，僅限 renart.00001@gmail.com 登入後展開 -->
         <div id="timelineNodesWrapper" class="hidden relative pl-6 sm:pl-8 border-l-2 border-indigo-800/80 ml-2 sm:ml-4 space-y-8">
+
+          <!-- Node 2: v1.1.0 -->
+          <div class="relative group">
+            <div class="absolute -left-[31px] sm:-left-[39px] top-0.5 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs shadow-md ring-4 ring-indigo-950 font-bold">
+              ◫
+            </div>
+            <div class="bg-slate-850/80 border border-slate-800 rounded-xl p-4 sm:p-5 transition hover:shadow-sm">
+              <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="px-2.5 py-0.5 rounded-md text-xs font-bold bg-indigo-600 text-white shadow-xs">v1.1.0</span>
+                  <span class="text-xs font-bold text-slate-400">2026-10-27</span>
+                  <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">版面佈局優化 / 雙引擎左右並列與寬屏支援</span>
+                </div>
+                <span class="text-[11px] font-mono text-slate-400">commit: [pending]</span>
+              </div>
+              <h3 class="text-sm sm:text-base font-bold text-white mb-2">
+                雙引擎畫布版面配置切換・預設左右並列 (50%:50%)・寬屏全幅模式・自適應排版優化
+              </h3>
+              <div class="flex flex-wrap gap-1.5 mb-3">
+                <span class="px-2 py-0.5 rounded text-[11px] font-medium bg-slate-800 text-indigo-300 border border-slate-700">◫ 左右並列</span>
+                <span class="px-2 py-0.5 rounded text-[11px] font-medium bg-slate-800 text-amber-300 border border-slate-700">☰ 上下排列</span>
+                <span class="px-2 py-0.5 rounded text-[11px] font-medium bg-slate-800 text-emerald-300 border border-slate-700">↔ 寬屏展開</span>
+                <span class="px-2 py-0.5 rounded text-[11px] font-medium bg-slate-800 text-purple-300 border border-slate-700">💾 偏好記憶</span>
+              </div>
+              <ul class="text-xs sm:text-sm text-slate-300 space-y-1.5 leading-relaxed list-disc list-inside">
+                <li><strong>預設強制左右並列 (Side-by-Side)</strong>：解除原先窄螢幕自動降級為垂直堆疊的限制，在各解析度下預設維持雙引擎 50%:50% 對等並列。</li>
+                <li><strong>版面模式一鍵切換</strong>：新增「左右並列」與「上下排列」切換按鈕，滿足不同圖表長寬比之檢視需求。</li>
+                <li><strong>寬屏展開模式 (Wide Mode)</strong>：支援將版面擴充至 1720px 超寬全幅，大幅擴展左右雙引擎對比的向量繪圖區域。</li>
+                <li><strong>防擠壓與溢出保護</strong>：卡片容器全面配置 <code>min-w-0</code> 與獨立雙向捲軸，防止大型 SVG 變形或擠壓欄位。</li>
+                <li><strong>偏好記憶持久化</strong>：使用者所選擇之版面模式與寬屏設定均透過 LocalStorage 自動記憶，重整頁面無縫維持。</li>
+              </ul>
+            </div>
+          </div>
 
           <!-- Node 1: v1.0.0 -->
           <div class="relative group">
@@ -804,6 +866,64 @@
         if (/^\s*classDiagram/i.test(text)) return 'class';
         return 'mermaid-diagram';
       }
+
+      // 版面模式控制 (左右並列 / 上下排列 / 寬屏全幅)
+      const comparisonGrid = document.getElementById('comparisonGrid');
+      const layoutSideBySideBtn = document.getElementById('layoutSideBySideBtn');
+      const layoutStackedBtn = document.getElementById('layoutStackedBtn');
+      const toggleWideModeBtn = document.getElementById('toggleWideModeBtn');
+      const wideModeText = document.getElementById('wideModeText');
+      const currentLayoutBadge = document.getElementById('currentLayoutBadge');
+      const mainAppContainer = document.querySelector('main');
+
+      function updateLayoutUI(mode) {
+        if (!comparisonGrid) return;
+        if (mode === 'stacked') {
+          comparisonGrid.className = 'grid grid-cols-1 gap-5 items-stretch w-full transition-all duration-200';
+          if (layoutStackedBtn) layoutStackedBtn.className = 'px-3 py-1 rounded bg-indigo-600 text-white font-bold transition text-xs flex items-center gap-1.5 shadow-xs';
+          if (layoutSideBySideBtn) layoutSideBySideBtn.className = 'px-3 py-1 rounded text-slate-300 hover:text-white hover:bg-slate-700 transition text-xs flex items-center gap-1.5';
+          if (currentLayoutBadge) currentLayoutBadge.textContent = '單欄上下排列 (100% 全幅)';
+        } else {
+          // 預設: side-by-side
+          comparisonGrid.className = 'grid grid-cols-2 gap-4 items-stretch w-full transition-all duration-200';
+          if (layoutSideBySideBtn) layoutSideBySideBtn.className = 'px-3 py-1 rounded bg-indigo-600 text-white font-bold transition text-xs flex items-center gap-1.5 shadow-xs';
+          if (layoutStackedBtn) layoutStackedBtn.className = 'px-3 py-1 rounded text-slate-300 hover:text-white hover:bg-slate-700 transition text-xs flex items-center gap-1.5';
+          if (currentLayoutBadge) currentLayoutBadge.textContent = '雙欄左右並列 (50% : 50%)';
+        }
+        try { localStorage.setItem('pele_layout_mode', mode); } catch (_) {}
+      }
+
+      function updateWideModeUI(isWide) {
+        if (!mainAppContainer) return;
+        if (isWide) {
+          mainAppContainer.classList.remove('max-w-7xl');
+          mainAppContainer.classList.add('max-w-[1720px]');
+          if (wideModeText) wideModeText.textContent = '收合標準寬度';
+          if (toggleWideModeBtn) toggleWideModeBtn.classList.add('bg-indigo-950', 'text-indigo-300', 'border-indigo-800');
+        } else {
+          mainAppContainer.classList.remove('max-w-[1720px]');
+          mainAppContainer.classList.add('max-w-7xl');
+          wideModeText.textContent = '寬屏展開';
+          if (toggleWideModeBtn) toggleWideModeBtn.classList.remove('bg-indigo-950', 'text-indigo-300', 'border-indigo-800');
+        }
+        try { localStorage.setItem('pele_wide_mode', isWide ? 'wide' : 'normal'); } catch (_) {}
+      }
+
+      try {
+        const savedLayout = localStorage.getItem('pele_layout_mode') || 'side-by-side';
+        updateLayoutUI(savedLayout);
+        const savedWide = localStorage.getItem('pele_wide_mode') === 'wide';
+        updateWideModeUI(savedWide);
+      } catch (_) {
+        updateLayoutUI('side-by-side');
+      }
+
+      if (layoutSideBySideBtn) layoutSideBySideBtn.addEventListener('click', () => updateLayoutUI('side-by-side'));
+      if (layoutStackedBtn) layoutStackedBtn.addEventListener('click', () => updateLayoutUI('stacked'));
+      if (toggleWideModeBtn) toggleWideModeBtn.addEventListener('click', () => {
+        const isCurrentlyWide = mainAppContainer && mainAppContainer.classList.contains('max-w-[1720px]');
+        updateWideModeUI(!isCurrentlyWide);
+      });
 
       // 雙引擎對比核心渲染函式
       async function runComparisonRender() {
