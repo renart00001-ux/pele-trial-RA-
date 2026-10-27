@@ -1171,14 +1171,14 @@
           setZoom(currentSyncZoom + zoomDelta, false);
         }, { passive: false });
 
-        // 2. 滑鼠按住拖曳平移 (Pan / Drag) - 透過精確座標差值實現零延遲 1:1 跟手拖曳
+        // 2. 滑鼠按住拖曳平移 (Pan / Drag) - 加入防呆目標校驗與邊界限制
         let startClientX = 0, startClientY = 0;
         let startPanX = 0, startPanY = 0;
+        let isThisCanvasDragging = false;
 
         canvasEl.addEventListener('mousedown', function (e) {
           if (e.target.closest('button, input, select, .canvas-zoom-widget')) return;
-          isCanvasDragging = true;
-          document.body.classList.add('select-none');
+          isThisCanvasDragging = true;
           canvasEl.classList.add('cursor-grabbing');
           canvasEl.classList.remove('cursor-grab');
           
@@ -1189,23 +1189,21 @@
         });
 
         window.addEventListener('mousemove', function (e) {
-          if (!isCanvasDragging) return;
+          if (!isThisCanvasDragging) return;
           e.preventDefault();
           const dx = e.clientX - startClientX;
           const dy = e.clientY - startClientY;
-          currentPanX = startPanX + dx;
-          currentPanY = startPanY + dy;
+          // 防飛出邊界保護，確保圖紙絕對不消失
+          currentPanX = Math.max(-1200, Math.min(1200, startPanX + dx));
+          currentPanY = Math.max(-1200, Math.min(1200, startPanY + dy));
           applyTransform(false);
         });
 
         window.addEventListener('mouseup', function () {
-          if (!isCanvasDragging) return;
-          isCanvasDragging = false;
-          document.body.classList.remove('select-none');
-          if (canvasEl) {
-            canvasEl.classList.remove('cursor-grabbing');
-            canvasEl.classList.add('cursor-grab');
-          }
+          if (!isThisCanvasDragging) return;
+          isThisCanvasDragging = false;
+          canvasEl.classList.remove('cursor-grabbing');
+          canvasEl.classList.add('cursor-grab');
         });
 
         // 3. 雙擊畫布快速重設 (回到原點與 100%)
