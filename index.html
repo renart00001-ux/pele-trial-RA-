@@ -136,11 +136,20 @@
         linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
     }
 
-    /* SVG 縮放視窗平滑渲染 */
+    /* SVG 視口與平移畫布優化 */
+    .svg-viewport {
+      transform-origin: center center;
+      will-change: transform;
+      user-select: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
     .svg-viewport svg {
-      transition: transform 0.05s ease-out;
-      transform-origin: 0 0;
       filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.25));
+      max-width: 100%;
+      height: auto;
+      pointer-events: none; /* 防止滑鼠拖拽時選取文字或觸發瀏覽器拖圖，確保平移極度流暢 */
     }
   </style>
 </head>
@@ -388,7 +397,7 @@
         </div>
 
         <!-- 畫布區塊 (支援滑鼠滾輪縮放、按住拖曳平移) -->
-        <div id="mermaidCanvasArea" class="flex-1 relative overflow-auto p-6 flex items-center justify-center canvas-grid min-h-[420px] max-h-[600px] cursor-grab select-none">
+        <div id="mermaidCanvasArea" class="flex-1 relative overflow-hidden p-6 flex items-center justify-center canvas-grid min-h-[420px] max-h-[600px] cursor-grab select-none">
           <!-- 錯誤警告視窗 -->
           <div id="mermaidErrorBox" class="hidden absolute inset-4 bg-rose-950/90 border border-rose-800 rounded-xl p-4 text-xs font-mono text-rose-300 overflow-auto z-10 whitespace-pre-wrap"></div>
           
@@ -444,7 +453,7 @@
         </div>
 
         <!-- 畫布區塊 (支援滑鼠滾輪縮放、按住拖曳平移) -->
-        <div id="peleCanvasArea" class="flex-1 relative overflow-auto p-6 flex items-center justify-center canvas-grid min-h-[420px] max-h-[600px] cursor-grab select-none">
+        <div id="peleCanvasArea" class="flex-1 relative overflow-hidden p-6 flex items-center justify-center canvas-grid min-h-[420px] max-h-[600px] cursor-grab select-none">
           <!-- 錯誤警告視窗 -->
           <div id="peleErrorBox" class="hidden absolute inset-4 bg-rose-950/90 border border-rose-800 rounded-xl p-4 text-xs font-mono text-rose-300 overflow-auto z-10 whitespace-pre-wrap"></div>
           
@@ -533,7 +542,7 @@
                   <span class="text-xs font-bold text-slate-400">2026-10-27</span>
                   <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">畫布手勢縮放・平移拖曳・一鍵適配 Fit</span>
                 </div>
-                <span class="text-[11px] font-mono text-slate-400">commit: [pending]</span>
+                <span class="text-[11px] font-mono text-slate-400">commit: a24cdd1</span>
               </div>
               <h3 class="text-sm sm:text-base font-bold text-white mb-2">
                 畫布直覺滑鼠滾輪縮放・按住拖曳平移 (Pan)・雙擊還原・浮動縮放控制列・一鍵自動最適大小 (Fit)
@@ -1113,67 +1122,96 @@
         peleContainer.className = this.value + ' transition-colors duration-200 p-4 rounded-xl flex items-center justify-center max-w-full';
       });
 
-      // 雙視窗畫布同步縮放與手勢平移核心
-      function setZoom(newLevel) {
-        currentSyncZoom = Math.min(5.0, Math.max(0.25, Number(newLevel.toFixed(2))));
-        if (mermaidViewport) mermaidViewport.style.transform = 'scale(' + currentSyncZoom + ')';
-        if (peleViewport) peleViewport.style.transform = 'scale(' + currentSyncZoom + ')';
+      // 雙視窗畫布同步縮放與滑鼠手勢平移核心 (基於 CSS Translate + Scale，極速跟手)
+      let currentPanX = 0;
+      let currentPanY = 0;
+      let isCanvasDragging = false;
+
+      function applyTransform(withTransition = false) {
+        const transStyle = withTransition ? 'transform 0.22s cubic-bezier(0.16, 1, 0.3, 1)' : 'none';
+        const transformStr = 'translate(' + currentPanX + 'px, ' + currentPanY + 'px) scale(' + currentSyncZoom + ')';
+        
+        if (mermaidViewport) {
+          mermaidViewport.style.transition = transStyle;
+          mermaidViewport.style.transform = transformStr;
+        }
+        if (peleViewport) {
+          peleViewport.style.transition = transStyle;
+          peleViewport.style.transform = transformStr;
+        }
         
         const pctText = Math.round(currentSyncZoom * 100) + '%';
         if (syncZoomLevelText) syncZoomLevelText.textContent = pctText;
         document.querySelectorAll('.zoom-level-text').forEach(el => el.textContent = pctText);
       }
 
+      function setZoom(newLevel, withTransition = true) {
+        currentSyncZoom = Math.min(5.0, Math.max(0.25, Number(newLevel.toFixed(2))));
+        applyTransform(withTransition);
+      }
+
+      function resetZoomAndPan() {
+        currentSyncZoom = 1.0;
+        currentPanX = 0;
+        currentPanY = 0;
+        applyTransform(true);
+      }
+
       function applySyncZoom() {
-        setZoom(currentSyncZoom);
+        applyTransform(false);
       }
 
       function setupCanvasInteractions(canvasEl, viewportEl, fitBtnId) {
         if (!canvasEl) return;
 
-        // 1. 滑鼠滾輪縮放 (支援直接滾輪或 Ctrl+滾輪)
+        // 1. 滑鼠滾輪縮放 (平滑縮放)
         canvasEl.addEventListener('wheel', function (e) {
           e.preventDefault();
           const zoomDelta = e.deltaY < 0 ? 0.15 : -0.15;
-          setZoom(currentSyncZoom + zoomDelta);
+          setZoom(currentSyncZoom + zoomDelta, false);
         }, { passive: false });
 
-        // 2. 滑鼠按住拖曳平移 (Pan / Drag)
-        let isDragging = false;
-        let startX = 0, startY = 0;
-        let startScrollLeft = 0, startScrollTop = 0;
+        // 2. 滑鼠按住拖曳平移 (Pan / Drag) - 透過精確座標差值實現零延遲 1:1 跟手拖曳
+        let startClientX = 0, startClientY = 0;
+        let startPanX = 0, startPanY = 0;
 
         canvasEl.addEventListener('mousedown', function (e) {
           if (e.target.closest('button, input, select, .canvas-zoom-widget')) return;
-          isDragging = true;
+          isCanvasDragging = true;
+          document.body.classList.add('select-none');
           canvasEl.classList.add('cursor-grabbing');
           canvasEl.classList.remove('cursor-grab');
-          startX = e.pageX;
-          startY = e.pageY;
-          startScrollLeft = canvasEl.scrollLeft;
-          startScrollTop = canvasEl.scrollTop;
+          
+          startClientX = e.clientX;
+          startClientY = e.clientY;
+          startPanX = currentPanX;
+          startPanY = currentPanY;
         });
 
         window.addEventListener('mousemove', function (e) {
-          if (!isDragging) return;
+          if (!isCanvasDragging) return;
           e.preventDefault();
-          const dx = e.pageX - startX;
-          const dy = e.pageY - startY;
-          canvasEl.scrollLeft = startScrollLeft - dx;
-          canvasEl.scrollTop = startScrollTop - dy;
+          const dx = e.clientX - startClientX;
+          const dy = e.clientY - startClientY;
+          currentPanX = startPanX + dx;
+          currentPanY = startPanY + dy;
+          applyTransform(false);
         });
 
         window.addEventListener('mouseup', function () {
-          if (!isDragging) return;
-          isDragging = false;
-          canvasEl.classList.remove('cursor-grabbing');
-          canvasEl.classList.add('cursor-grab');
+          if (!isCanvasDragging) return;
+          isCanvasDragging = false;
+          document.body.classList.remove('select-none');
+          if (canvasEl) {
+            canvasEl.classList.remove('cursor-grabbing');
+            canvasEl.classList.add('cursor-grab');
+          }
         });
 
-        // 3. 雙擊快速還原 100%
+        // 3. 雙擊畫布快速重設 (回到原點與 100%)
         canvasEl.addEventListener('dblclick', function (e) {
           if (e.target.closest('button, input, select, .canvas-zoom-widget')) return;
-          setZoom(1.0);
+          resetZoomAndPan();
         });
 
         // 4. 自動最適大小 (Fit to Canvas)
@@ -1193,7 +1231,10 @@
             const scaleW = availW / unscaledW;
             const scaleH = availH / unscaledH;
             const bestFit = Math.min(scaleW, scaleH, 4.0);
-            setZoom(Math.max(0.3, bestFit));
+            
+            currentPanX = 0;
+            currentPanY = 0;
+            setZoom(Math.max(0.3, Number(bestFit.toFixed(2))), true);
           });
         }
       }
@@ -1204,18 +1245,18 @@
       setupCanvasInteractions(peleCanvasArea, peleViewport, 'peleFitBtn');
 
       // 頂部與浮動縮放按鈕監聽
-      syncZoomInBtn.addEventListener('click', () => setZoom(currentSyncZoom + 0.15));
-      syncZoomOutBtn.addEventListener('click', () => setZoom(currentSyncZoom - 0.15));
-      syncZoomResetBtn.addEventListener('click', () => setZoom(1.0));
+      syncZoomInBtn.addEventListener('click', () => setZoom(currentSyncZoom + 0.15, true));
+      syncZoomOutBtn.addEventListener('click', () => setZoom(currentSyncZoom - 0.15, true));
+      syncZoomResetBtn.addEventListener('click', resetZoomAndPan);
 
       document.querySelectorAll('.zoom-in-btn').forEach(btn => {
-        btn.addEventListener('click', () => setZoom(currentSyncZoom + 0.15));
+        btn.addEventListener('click', () => setZoom(currentSyncZoom + 0.15, true));
       });
       document.querySelectorAll('.zoom-out-btn').forEach(btn => {
-        btn.addEventListener('click', () => setZoom(currentSyncZoom - 0.15));
+        btn.addEventListener('click', () => setZoom(currentSyncZoom - 0.15, true));
       });
       document.querySelectorAll('.zoom-reset-btn').forEach(btn => {
-        btn.addEventListener('click', () => setZoom(1.0));
+        btn.addEventListener('click', resetZoomAndPan);
       });
 
       triggerRenderBtn.addEventListener('click', runComparisonRender);
