@@ -2,7 +2,8 @@
 
 > 專為比較與評估不同 Mermaid 向量圖形編譯引擎所打造的即時對比工作台。上方即時輸入 Mermaid 語法，下方雙欄即時對照 **Mermaid.js 官方標準引擎** 與 **Obsidian Pele 次毫秒超速引擎**，並內建 Firebase 雲端圖表庫與版本控制演進歷程。
 
-* 🌐 **GitHub 專案名稱**：`pele-trial(RA)`
+* 🌐 **GitHub 儲存庫**：[https://github.com/renart00001-ux/pele-trial-RA-](https://github.com/renart00001-ux/pele-trial-RA-)
+* 🚀 **線上對比展示 (GitHub Pages)**：[https://renart00001-ux.github.io/pele-trial-RA-/](https://renart00001-ux.github.io/pele-trial-RA-/)
 * 🚀 **支援引擎**：
   * **引擎 A (左)**：官方標準 `mermaid.js` (v11.4 CDN)
   * **引擎 B (右)**：Obsidian 官方純向量引擎 `pele` (v1.12.0 本地核心)
